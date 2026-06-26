@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}Doctor Dashboard — MediTrack{% endblock %}
+{% block extra_css %}
+<style>
+.injury-bank { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:8px; margin-top:12px; }
+.injury-item { background:#f1f5f9; border:2px solid #e2e8f0; border-radius:8px; padding:10px 14px; cursor:pointer; font-size:13px; transition:all .2s; }
+.injury-item:hover { border-color:#2563eb; }
+.injury-item.selected { border-color:#2563eb; background:#eff6ff; }
+.injury-item .sev-dot { display:inline-block; width:8px;height:8px;border-radius:50%;margin-right:6px; }
+.searched { background:#fefce8; border-color:#f59e0b; }
+.risk-result { display:inline-block; padding:6px 16px; border-radius:999px; font-weight:900; font-size:16px; margin-left:10px; }
+.risk-0 { background:#d1fae5; color:#065f46; }
+.risk-1 { background:#fee2e2; color:#991b1b; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container">
+    <h1 style="margin-bottom:20px">👨‍⚕️ Doctor Dashboard</h1>
+
+    <!-- Injury Bank + Patient Selector -->
+    <div class="card">
+        <h2>🩺 Add Injury Record</h2>
+        <div class="grid grid-2" style="margin-bottom:12px">
+            <div class="form-group">
+                <label>Select Patient</label>
+                <select id="patientSelect" style="width:100%;padding:10px;border-radius:8px;border:2px solid #e2e8f0;font-size:14px">
+                    <option value="">-- Search or Select Patient --</option>
+                    {% for p in patients %}<option value="{{ p.id }}">{{ p.first_name }} {{ p.second_name }} ({{ p.national_id }})</option>{% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>🔍 Search Injury Types</label>
+                <input type="text" id="injurySearch" placeholder="Type to search..." oninput="filterInjuries()"
+                       style="width:100%;padding:10px;border-radius:8px;border:2px solid #e2e8f0;font-size:14px">
+            </div>
+        </div>
+
+        <label style="font-size:13px;font-weight:600;color:#475569">Select one or more injury types:</label>
+        <div class="injury-bank" id="injuryBank">
+            {% set injuries_list = [
+                ('Head Injury', '#dc2626'), ('Skull Fracture', '#dc2626'), ('Concussion', '#f59e0b'),
+                ('Neck Injury', '#dc2626'), ('Spinal Injury', '#dc2626'), ('Whiplash', '#f59e0b'),
+                ('Arm Fracture', '#f59e0b'), ('Wrist Fracture', '#f59e0b'), ('Dislocated Shoulder', '#f59e0b'),
+                ('Leg Fracture', '#dc2626'), ('Knee Injury', '#f59e0b'), ('Ankle Sprain', '#3b82f6'),
+                ('Rib Fracture', '#f59e0b'), ('Internal Bleeding', '#dc2626'), ('Pneumothorax', '#dc2626'),
+                ('Burn - 1st Degree', '#3b82f6'), ('Burn - 2nd Degree', '#f59e0b'), ('Burn - 3rd Degree', '#dc2626'),
+                ('Laceration', '#3b82f6'), ('Deep Wound', '#f59e0b'), ('Gunshot Wound', '#dc2626'),
+                ('Stab Wound', '#dc2626'), ('Poisoning', '#dc2626'), ('Allergic Reaction', '#f59e0b'),
+                ('Cardiac Arrest', '#dc2626'), ('Stroke', '#dc2626'), ('Respiratory Distress', '#dc2626'),
+                ('Asthma Attack', '#f59e0b'), ('Diabetes Emergency', '#f59e0b'), ('Seizure', '#f59e0b'),
+                ('Eye Injury', '#f59e0b'), ('Dental Trauma', '#3b82f6'), ('Ear Injury', '#3b82f6'),
+                ('Nose Fracture', '#3b82f6'), ('Jaw Fracture', '#f59e0b'), ('Pelvic Fracture', '#dc2626'),
+                ('Hand Fracture', '#3b82f6'), ('Foot Fracture', '#3b82f6'), ('Crush Injury', '#dc2626'),
+                ('Electrical Shock', '#dc2626'), ('Drowning', '#dc2626'), ('Hypothermia', '#f59e0b'),
+                ('Heat Stroke', '#f59e0b'), ('Dehydration', '#3b82f6'), ('Road Accident - Multiple', '#dc2626'),
+            ] %}
+            {% for name, color in injuries_list %}
+            <div class="injury-item" onclick="toggleInjury(this)" data-name="{{ name }}">
+                <span class="sev-dot" data-color="{{ color }}"></span>{{ name }}
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Manual entry -->
+        <div class="grid grid-2" style="margin-top:12px">
+            <div class="form-group"><label>Custom Injury Type</label><input type="text" id="customInjury" placeholder="Or type custom injury"></div>
+        </div>
+
+        <!-- Form for bulk add -->
+        <form method="POST" action="{{ url_for('doctor.add_injury') }}" id="injuryForm" style="margin-top:16px">
+        <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+            <input type="hidden" name="patient_id" id="formPid">
+            <input type="hidden" name="injury_type" id="formInjuries">
+            <div class="grid grid-2">
+                <div class="form-group"><label>Injury Date</label><input type="date" name="injury_date" id="formDate" required></div>
+                <div class="form-group"><label>Severity</label><select name="severity" id="formSeverity">
+                    <option value="medium">Medium</option><option value="low">Low</option><option value="high">High</option><option value="critical">Critical</option></select></div>
+                <div class="form-group"><label>Treatment Given</label><input type="text" name="treatment" id="formTreatment"></div>
+                <div class="form-group"><label>Notes</label><input type="text" name="notes" id="formNotes"></div>
+            </div>
+            <div class="form-group"><label>Description</label><textarea name="injury_description" id="formDesc" rows="2"></textarea></div>
+            <div style="display:flex;align-items:center;gap:12px">
+                <button type="submit" class="btn btn-success" onclick="return prepareSubmit()">➕ Add Injury(ies)</button>
+                <span id="selectedCount" style="font-size:13px;color:#64748b"></span>
+                <span id="riskPreview"></span>
+            </div>
+        </form>
+    </div>
+
+    <!-- Register Paramedic -->
+    <div class="card"><h2>🚑 Register Paramedic</h2>
+        <form method="POST" action="{{ url_for('doctor.add_paramedic') }}">
+        <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+            <div class="grid grid-2">
+                <div class="form-group"><label>First Name</label><input type="text" name="first_name" required></div>
+                <div class="form-group"><label>Second Name</label><input type="text" name="second_name" required></div>
+                <div class="form-group"><label>Username</label><input type="text" name="username" required></div>
+                <div class="form-group"><label>National ID</label><input type="text" name="national_id" maxlength="14" required></div>
+                <div class="form-group"><label>Phone</label><input type="text" name="phone" required></div>
+                <div class="form-group"><label>Password</label><input type="password" name="password" required></div>
+            </div>
+            <button type="submit" class="btn btn-primary">Register Paramedic</button>
+        </form>
+    </div>
+
+    <!-- My Paramedics -->
+    <div class="card"><h2>📋 My Paramedics ({{ paramedics|length }})</h2>
+        <table><tr><th>Name</th><th>National ID</th><th>Phone</th><th>Hospital</th></tr>
+        {% for pm in paramedics %}<tr><td>{{ pm.first_name }} {{ pm.second_name }}</td><td>{{ pm.national_id }}</td><td>{{ pm.phone }}</td><td>{{ pm.hospital_name or 'N/A' }}</td></tr>{% endfor %}</table>
+    </div>
+</div>
+
+<script>
+let selectedInjuries = [];
+
+// Apply dot colours from data-color (avoids Jinja in CSS context)
+document.querySelectorAll('.sev-dot[data-color]').forEach(function(el) {
+    el.style.background = el.dataset.color;
+});
+
+function toggleInjury(el) {
+    const name = el.dataset.name;
+    el.classList.toggle('selected');
+    if (el.classList.contains('selected')) {
+        selectedInjuries.push(name);
+    } else {
+        selectedInjuries = selectedInjuries.filter(i => i !== name);
+    }
+    updatePreview();
+}
+
+function filterInjuries() {
+    const q = document.getElementById('injurySearch').value.toLowerCase();
+    document.querySelectorAll('.injury-item').forEach(el => {
+        el.classList.remove('searched');
+        if (q && el.dataset.name.toLowerCase().includes(q)) {
+            el.classList.add('searched');
+            el.scrollIntoView({behavior:'smooth',block:'center'});
+        }
+    });
+}
+
+function updatePreview() {
+    const custom = document.getElementById('customInjury').value.trim();
+    const all = [...selectedInjuries];
+    if (custom) all.push(custom);
+    document.getElementById('selectedCount').textContent = all.length ? `${all.length} injury type(s) selected: ${all.join(', ')}` : '';
+    
+    // Preview risk (simplified — actual calculation happens server-side)
+    if (all.length > 0) {
+        const critical = all.filter(i => ['Cardiac Arrest','Stroke','Internal Bleeding','Gunshot Wound','Spinal Injury','Head Injury','Skull Fracture'].includes(i));
+        const risk = critical.length > 0 ? 1 : 0;
+        document.getElementById('riskPreview').innerHTML = `<span class="risk-result risk-${risk}">Predicted Risk: ${risk}</span>`;
+    } else {
+        document.getElementById('riskPreview').innerHTML = '';
+    }
+}
+
+function prepareSubmit() {
+    const pid = document.getElementById('patientSelect').value;
+    if (!pid) { alert('Please select a patient'); return false; }
+    
+    const custom = document.getElementById('customInjury').value.trim();
+    const all = [...selectedInjuries];
+    if (custom) all.push(custom);
+    if (!all.length) { alert('Please select at least one injury type'); return false; }
+    if (!document.getElementById('formDate').value) { alert('Please select injury date'); return false; }
+    
+    document.getElementById('formPid').value = pid;
+    document.getElementById('formInjuries').value = all.join(' | ');
+    document.getElementById('formDesc').value = all.join('; ');
+    return true;
+}
+
+document.getElementById('customInjury').addEventListener('input', updatePreview);
+</script>
+{% endblock %}

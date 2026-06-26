@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+{% block title %}Sign In — MediTrack{% endblock %}
+{% block topbar_title %}Welcome{% endblock %}
+{% block extra_css %}
+<style>
+.login-wrap {
+    min-height: calc(100vh - 64px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 40px 20px; position: relative; overflow: hidden;
+}
+
+/* ── 3D Floating geometric shapes ── */
+.floating-shapes {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    perspective: 1000px;
+}
+.shape {
+    position: absolute; opacity: 0.06;
+    animation: floatShape var(--dur) ease-in-out infinite;
+    animation-delay: var(--delay);
+    transform-style: preserve-3d;
+}
+[data-theme="dark"] .shape { opacity: 0.12; }
+.shape-hex {
+    width: 80px; height: 70px; background: var(--text);
+    clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+}
+.shape-diamond {
+    width: 60px; height: 60px; background: var(--text);
+    transform: rotate(45deg); border-radius: 8px;
+}
+.shape-circle { width: 55px; height: 55px; background: var(--text); border-radius: 50%; }
+.shape-cross { width: 65px; height: 65px; position: relative; }
+.shape-cross::before, .shape-cross::after {
+    content: ''; position: absolute; background: var(--text); border-radius: 4px;
+}
+.shape-cross::before { width: 65px; height: 16px; top: 25px; left: 0; }
+.shape-cross::after { width: 16px; height: 65px; top: 0; left: 25px; }
+.shape-triangle {
+    width: 0; height: 0;
+    border-left: 35px solid transparent;
+    border-right: 35px solid transparent;
+    border-bottom: 60px solid var(--text);
+    background: transparent !important;
+}
+
+.s1 { top: 6%; left: 4%; --dur: 7s; --delay: 0s; }
+.s2 { top: 12%; right: 6%; --dur: 9s; --delay: -2s; }
+.s3 { bottom: 18%; left: 8%; --dur: 8s; --delay: -4s; }
+.s4 { bottom: 10%; right: 4%; --dur: 10s; --delay: -1s; }
+.s5 { top: 40%; left: 2%; --dur: 6.5s; --delay: -3s; }
+.s6 { top: 30%; right: 3%; --dur: 7.5s; --delay: -5s; }
+.s7 { top: 55%; right: 12%; --dur: 8.5s; --delay: -6s; }
+.s8 { bottom: 35%; left: 5%; --dur: 9.5s; --delay: -2.5s; }
+
+@keyframes floatShape {
+    0%   { transform: translateZ(0) rotateX(0) rotateY(0) rotateZ(0) translate(0,0); opacity: 0.04; }
+    25%  { transform: translateZ(80px) rotateX(20deg) rotateY(15deg) rotateZ(8deg) translate(20px,-25px); opacity: 0.1; }
+    50%  { transform: translateZ(40px) rotateX(-8deg) rotateY(25deg) rotateZ(-8deg) translate(-15px,15px); opacity: 0.06; }
+    75%  { transform: translateZ(100px) rotateX(15deg) rotateY(-20deg) rotateZ(12deg) translate(25px,20px); opacity: 0.12; }
+    100% { transform: translateZ(0) rotateX(0) rotateY(0) rotateZ(0) translate(0,0); opacity: 0.04; }
+}
+
+/* ── Login Card — Glass + 3D ── */
+.login-card {
+    width: 100%; max-width: 460px;
+    background: var(--surface);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--border);
+    border-radius: 28px;
+    padding: 44px 44px 40px;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.08);
+    position: relative; z-index: 2;
+    animation: cardEntrance 0.7s cubic-bezier(0.34,1.56,0.64,1) forwards;
+    transform-style: preserve-3d;
+}
+@keyframes cardEntrance {
+    0%   { opacity: 0; transform: scale(0.88) translateY(50px) rotateX(10deg); }
+    100% { opacity: 1; transform: scale(1) translateY(0) rotateX(0); }
+}
+
+.login-logo {
+    width: 60px; height: 60px;
+    background: linear-gradient(135deg, var(--text) 0%, var(--text2) 100%);
+    border-radius: 18px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; font-weight: 800;
+    margin: 0 auto 12px; color: var(--bg);
+    box-shadow: 0 12px 32px var(--accent-glow), 0 0 60px var(--accent-glow);
+    position: relative;
+    animation: logoFloat 3s ease-in-out infinite;
+}
+@keyframes logoFloat {
+    0%,100% { transform: translateY(0); box-shadow: 0 12px 32px var(--accent-glow); }
+    50%     { transform: translateY(-6px); box-shadow: 0 18px 40px var(--accent-glow); }
+}
+
+.login-title { font-size: 24px; font-weight: 800; color: var(--text); text-align: center; letter-spacing: -0.5px; }
+.login-sub { font-size: 13px; color: var(--text3); text-align: center; margin-bottom: 32px; }
+
+/* ── Role selector ── */
+.role-selector { display: flex; gap: 10px; margin-bottom: 28px; justify-content: center; }
+.role-chip {
+    flex: 1; padding: 12px 8px; border: 1.5px solid var(--border);
+    border-radius: 14px; background: var(--surface); backdrop-filter: blur(12px);
+    cursor: pointer; text-align: center; font-size: 12px; font-weight: 600;
+    color: var(--text3); transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+    user-select: none; position: relative; overflow: hidden;
+    transform-style: preserve-3d;
+}
+.role-chip:hover { border-color: var(--text); color: var(--text); transform: translateY(-3px) translateZ(10px); box-shadow: var(--shadow); }
+.role-chip.active {
+    background: var(--text); color: var(--bg); border-color: var(--text);
+    box-shadow: 0 8px 28px var(--accent-glow); transform: translateZ(6px);
+    animation: roleGlow 2.5s ease-in-out infinite;
+}
+@keyframes roleGlow {
+    0%,100% { box-shadow: 0 8px 28px var(--accent-glow); }
+    50%     { box-shadow: 0 8px 40px var(--accent-glow), 0 0 60px var(--accent-glow); }
+}
+.role-chip .role-icon { display: block; font-size: 22px; margin-bottom: 5px; }
+.role-chip .role-label { display: block; font-size: 10px; letter-spacing: 0.5px; }
+
+/* ── Fields ── */
+.field { margin-bottom: 18px; opacity: 0; animation: fieldSlide 0.5s ease forwards; }
+.field:nth-child(1) { animation-delay: 0.15s; }
+.field:nth-child(2) { animation-delay: 0.3s; }
+@keyframes fieldSlide { from { opacity:0; transform: translateX(-20px); } to { opacity:1; transform: translateX(0); } }
+.field label {
+    display: block; font-size: 11px; font-weight: 700;
+    color: var(--text2); letter-spacing: 1px;
+    text-transform: uppercase; margin-bottom: 8px;
+}
+.field-inner { position: relative; }
+.field-inner i {
+    position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+    font-size: 16px; color: var(--text3); pointer-events: none;
+    transition: color 0.2s;
+}
+.field input:focus ~ i, .field-inner:focus-within i { color: var(--text); }
+.field input, .field select {
+    width: 100%; padding: 13px 16px 13px 46px;
+    border: 1.5px solid var(--border); border-radius: 14px;
+    font-size: 14px; font-family: 'Inter', sans-serif;
+    background: var(--surface); color: var(--text);
+    backdrop-filter: blur(8px);
+    transition: all 0.3s; outline: none;
+    -webkit-appearance: none; appearance: none;
+}
+.field select {
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M6 8L1 3h10z' fill='%23999'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 16px center;
+    padding-right: 40px;
+}
+.field input:focus, .field select:focus {
+    border-color: var(--text); transform: translateY(-1px);
+    box-shadow: 0 0 0 4px var(--accent-glow);
+}
+
+.login-btn {
+    width: 100%; padding: 14px;
+    background: var(--text); color: var(--bg);
+    border: none; border-radius: 14px;
+    font-size: 15px; font-weight: 700; cursor: pointer;
+    font-family: 'Inter', sans-serif; letter-spacing: 0.3px;
+    transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+    margin-top: 12px; position: relative; overflow: hidden;
+}
+.login-btn::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.2) 50%, transparent 70%);
+    transform: translateX(-100%); transition: transform 0.5s;
+}
+.login-btn:hover { transform: translateY(-3px); box-shadow: 0 14px 36px var(--accent-glow); }
+.login-btn:hover::after { transform: translateX(100%); }
+.login-btn:active { transform: scale(0.97); }
+.login-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+.login-footer { text-align: center; margin-top: 28px; font-size: 13px; color: var(--text3); }
+.login-footer a { color: var(--text); font-weight: 600; text-decoration: none; transition: opacity 0.2s; }
+.login-footer a:hover { opacity: 0.7; }
+
+.divider {
+    display: flex; align-items: center; gap: 14px;
+    margin: 24px 0; color: var(--text3); font-size: 11px; font-weight: 500;
+}
+.divider::before, .divider::after { content:''; flex:1; height:1px; background:var(--border); }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Floating 3D shapes -->
+<div class="floating-shapes">
+    <div class="shape shape-hex s1"></div>
+    <div class="shape shape-diamond s2"></div>
+    <div class="shape shape-circle s3"></div>
+    <div class="shape shape-cross s4"></div>
+    <div class="shape shape-triangle s5"></div>
+    <div class="shape shape-hex s6"></div>
+    <div class="shape shape-diamond s7"></div>
+    <div class="shape shape-circle s8"></div>
+</div>
+
+<div class="login-wrap">
+    <div class="login-card">
+        <div class="login-logo">+</div>
+        <h1 class="login-title">MediTrack</h1>
+        <p class="login-sub">Injury QR Tracking System</p>
+
+        <div class="role-selector" id="roleSelector">
+            <div class="role-chip active" data-role="patient" onclick="selectRole('patient',this)">
+                <span class="role-icon">🤕</span>
+                <span class="role-label">Patient</span>
+            </div>
+            <div class="role-chip" data-role="doctor" onclick="selectRole('doctor',this)">
+                <span class="role-icon">🩺</span>
+                <span class="role-label">Doctor</span>
+            </div>
+            <div class="role-chip" data-role="paramedic" onclick="selectRole('paramedic',this)">
+                <span class="role-icon">🚑</span>
+                <span class="role-label">Paramedic</span>
+            </div>
+        </div>
+
+        <form method="POST" id="loginForm">
+            <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+            <input type="hidden" name="selected_role" id="selectedRole" value="patient">
+
+            <div class="field">
+                <label>National ID</label>
+                <div class="field-inner">
+                    <i class="bi bi-person"></i>
+                    <input type="text" name="national_id" placeholder="14-digit Egyptian National ID" maxlength="14" required autocomplete="off" id="nidInput">
+                </div>
+            </div>
+            <div class="field">
+                <label>Password</label>
+                <div class="field-inner">
+                    <i class="bi bi-lock"></i>
+                    <input type="password" name="password" placeholder="Your password" required id="pwInput">
+                </div>
+            </div>
+            <button type="submit" class="login-btn" id="loginBtn">Sign In</button>
+        </form>
+
+        <div class="divider">or</div>
+        <div class="login-footer">
+            New patient? <a href="{{ url_for('auth.register') }}">Create account</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function selectRole(role, chip) {
+    document.querySelectorAll('.role-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    document.getElementById('selectedRole').value = role;
+}
+document.getElementById('loginForm').addEventListener('submit', function() {
+    const btn = document.getElementById('loginBtn');
+    btn.textContent = 'Signing in…'; btn.disabled = true;
+});
+document.getElementById('nidInput').addEventListener('input', function() {
+    this.value = this.value.replace(/\D/g, '');
+});
+</script>
+{% endblock %}

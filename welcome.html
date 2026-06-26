@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+{% block title %}Welcome — MediTrack{% endblock %}
+{% block topbar_title %}Welcome{% endblock %}
+{% block extra_css %}
+<style>
+.welcome-page {
+    min-height: calc(100vh - 64px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    background: var(--bg);
+}
+
+/* ── Confetti rain ── */
+.confetti-container {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+}
+.confetti-piece {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    top: -20px;
+    border-radius: 2px;
+    animation: confettiFall var(--fall-dur) linear forwards;
+    animation-delay: var(--fall-delay);
+    opacity: 0;
+}
+@keyframes confettiFall {
+    0%   { transform: translateY(0) rotate(0deg) scale(1); opacity: 1; }
+    25%  { transform: translateY(25vh) rotate(180deg) translateX(var(--drift)) scale(0.9); }
+    50%  { transform: translateY(50vh) rotate(360deg) translateX(calc(var(--drift) * -0.5)) scale(0.8); }
+    75%  { transform: translateY(75vh) rotate(540deg) translateX(var(--drift)) scale(0.6); opacity: 0.7; }
+    100% { transform: translateY(100vh) rotate(720deg) translateX(calc(var(--drift) * -0.3)) scale(0.3); opacity: 0; }
+}
+
+/* ── Welcome card ── */
+.welcome-card {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    padding: 48px 40px;
+    max-width: 440px;
+    animation: welcomePop 0.7s cubic-bezier(0.34,1.56,0.64,1) forwards;
+}
+@keyframes welcomePop {
+    0%   { opacity: 0; transform: scale(0.8) translateY(30px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.welcome-emoji {
+    font-size: 64px;
+    display: block;
+    margin-bottom: 16px;
+    animation: emojiBounce 0.6s ease 0.3s both;
+}
+@keyframes emojiBounce {
+    0%   { transform: scale(0) rotate(-20deg); opacity: 0; }
+    60%  { transform: scale(1.2) rotate(5deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0deg); }
+}
+
+.welcome-title {
+    font-size: 32px;
+    font-weight: 900;
+    color: var(--text);
+    letter-spacing: -1px;
+    margin-bottom: 8px;
+    animation: titleIn 0.5s ease 0.5s both;
+}
+@keyframes titleIn {
+    from { opacity: 0; transform: translateY(15px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.welcome-subtitle {
+    font-size: 15px;
+    color: var(--text3);
+    margin-bottom: 32px;
+    animation: titleIn 0.5s ease 0.65s both;
+}
+
+.welcome-badge {
+    display: inline-block;
+    padding: 6px 16px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+    animation: titleIn 0.5s ease 0.8s both;
+}
+.badge-role-admin { background: var(--text); color: var(--bg); }
+.badge-role-doctor { background: var(--text); color: var(--bg); }
+.badge-role-paramedic { background: var(--text); color: var(--bg); }
+.badge-role-patient { background: var(--bg2); color: var(--text); border: 1px solid var(--border); }
+
+/* ── Action buttons ── */
+.welcome-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+    animation: titleIn 0.5s ease 1s both;
+}
+.welcome-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    border-radius: 14px;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.25s;
+    cursor: pointer;
+    border: none;
+    font-family: 'Inter', sans-serif;
+}
+.welcome-btn-primary {
+    background: var(--text);
+    color: var(--bg);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+}
+.welcome-btn-primary:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 14px 32px rgba(0,0,0,0.25);
+}
+.welcome-btn-outline {
+    background: transparent;
+    color: var(--text);
+    border: 1.5px solid var(--border);
+}
+.welcome-btn-outline:hover {
+    background: var(--bg2);
+    transform: translateY(-2px);
+}
+
+/* ── Floating geometric shapes ── */
+.welcome-shapes {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    perspective: 800px;
+}
+.wshape {
+    position: absolute;
+    opacity: 0.06;
+    animation: wFloat var(--dur) ease-in-out infinite;
+    animation-delay: var(--delay);
+}
+[data-theme="dark"] .wshape { opacity: 0.12; }
+
+.wshape-hex {
+    width: 80px; height: 69px;
+    background: var(--text);
+    clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+}
+.wshape-diamond {
+    width: 60px; height: 60px;
+    background: var(--text);
+    transform: rotate(45deg);
+    border-radius: 8px;
+}
+.wshape-ring {
+    width: 55px; height: 55px;
+    border: 3px solid var(--text);
+    border-radius: 50%;
+    background: transparent;
+}
+
+.ws1 { top: 10%; left: 5%; --dur: 7s; --delay: 0s; }
+.ws2 { top: 20%; right: 8%; --dur: 9s; --delay: -2s; }
+.ws3 { bottom: 15%; left: 8%; --dur: 8s; --delay: -4s; }
+.ws4 { bottom: 25%; right: 6%; --dur: 6.5s; --delay: -1s; }
+.ws5 { top: 50%; left: 3%; --dur: 7.5s; --delay: -3s; }
+.ws6 { top: 40%; right: 4%; --dur: 8.5s; --delay: -5s; }
+
+@keyframes wFloat {
+    0%   { transform: translate(0,0) rotate(0deg) scale(1); }
+    33%  { transform: translate(20px,-15px) rotate(120deg) scale(1.1); }
+    66%  { transform: translate(-15px,10px) rotate(240deg) scale(0.9); }
+    100% { transform: translate(0,0) rotate(360deg) scale(1); }
+}
+
+/* ── Pulse dot around welcome ── */
+.welcome-pulse {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 200px; height: 200px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    opacity: 0;
+    animation: pulseRing 2s ease-out 0.8s both;
+    pointer-events: none;
+    z-index: -1;
+}
+@keyframes pulseRing {
+    0%   { width: 100px; height: 100px; opacity: 0.4; }
+    100% { width: 600px; height: 600px; opacity: 0; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="confetti-container" id="confettiContainer"></div>
+
+<div class="welcome-shapes">
+    <div class="wshape wshape-hex ws1"></div>
+    <div class="wshape wshape-diamond ws2"></div>
+    <div class="wshape wshape-ring ws3"></div>
+    <div class="wshape wshape-hex ws4"></div>
+    <div class="wshape wshape-diamond ws5"></div>
+    <div class="wshape wshape-ring ws6"></div>
+</div>
+
+<div class="welcome-page">
+    <div class="welcome-card" style="position:relative">
+        <div class="welcome-pulse"></div>
+
+        {% set role = session.role %}
+        {% if role == 'admin' %}
+            <span class="welcome-emoji">🛡️</span>
+            <h1 class="welcome-title">Welcome Admin</h1>
+            <p class="welcome-subtitle">System control panel is ready for you</p>
+        {% elif role == 'doctor' %}
+            <span class="welcome-emoji">🩺</span>
+            <h1 class="welcome-title">Welcome Doctor</h1>
+            <p class="welcome-subtitle">Your patients are waiting</p>
+        {% elif role == 'paramedic' %}
+            <span class="welcome-emoji">🚑</span>
+            <h1 class="welcome-title">Welcome Paramedic</h1>
+            <p class="welcome-subtitle">Ready to scan and respond</p>
+        {% else %}
+            <span class="welcome-emoji">🤕</span>
+            <h1 class="welcome-title">Welcome, {{ session.name }}</h1>
+            <p class="welcome-subtitle">Your health records, always accessible</p>
+        {% endif %}
+
+        <span class="welcome-badge badge-role-{{ role }}">{{ role | upper }}</span>
+
+        <div class="welcome-actions">
+            <a href="{{ url_for(session.role + '.dashboard') }}" class="welcome-btn welcome-btn-primary">
+                Go to Dashboard <i class="bi bi-arrow-right"></i>
+            </a>
+            <a href="{{ url_for('auth.logout') }}" class="welcome-btn welcome-btn-outline">
+                Sign Out
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Generate confetti pieces
+(function() {
+    const container = document.getElementById('confettiContainer');
+    const colors = ['var(--text)', '#555', '#999', '#333', '#777', '#aaa', '#bbb', '#222'];
+    const shapes = ['50%', '2px', '3px'];
+
+    for (let i = 0; i < 60; i++) {
+        const piece = document.createElement('div');
+        piece.className = 'confetti-piece';
+        piece.style.left = Math.random() * 100 + '%';
+        piece.style.setProperty('--fall-dur', (1.5 + Math.random() * 2.5) + 's');
+        piece.style.setProperty('--fall-delay', Math.random() * 1.5 + 's');
+        piece.style.setProperty('--drift', (Math.random() * 60 - 30) + 'px');
+        piece.style.width = (4 + Math.random() * 8) + 'px';
+        piece.style.height = (4 + Math.random() * 8) + 'px';
+        piece.style.borderRadius = shapes[Math.floor(Math.random() * shapes.length)];
+        piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+        container.appendChild(piece);
+    }
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Edit History — Admin{% endblock %}
+{% block content %}
+<div class="container">
+    <h1>📝 Edit History</h1>
+    <div style="margin-bottom:16px"><a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline">← Dashboard</a></div>
+    <div class="card">
+        <table><tr><th>ID</th><th>Injury ID</th><th>Edited By</th><th>Date</th><th>Old Data</th></tr>
+        {% for e in edits %}<tr>
+            <td>{{ e.id }}</td><td>{{ e.injury_record_id }}</td><td><strong>{{ e.editor_name }}</strong></td>
+            <td>{{ e.edited_at[:16] }}</td>
+            <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ e.old_data[:80] }}</td>
+        </tr>{% endfor %}</table>
+    </div>
+</div>
+{% endblock %}

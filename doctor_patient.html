@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}{{ patient.first_name }} {{ patient.second_name }} — MediTrack{% endblock %}
+{% block topbar_title %}Patient: {{ patient.first_name }} {{ patient.second_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.patient-header { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 24px; }
+.patient-info { flex: 1; min-width: 250px; }
+.patient-info h1 { font-size: 24px; font-weight: 800; margin-bottom: 4px; }
+.patient-info .pid { font-size: 12px; color: var(--text3); }
+.risk-meter { flex: 1; min-width: 300px; }
+.risk-bar-bg { height: 12px; background: var(--bg2); border-radius: 99px; overflow: hidden; margin: 8px 0; }
+.risk-bar-fill { height: 100%; border-radius: 99px; transition: width 1s ease; }
+.risk-low { background: #22c55e; }
+.risk-moderate { background: #f59e0b; }
+.risk-high { background: #ef4444; }
+.risk-critical { background: #dc2626; }
+
+.risk-details { font-size: 12px; color: var(--text2); }
+.model-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 14px; }
+.model-chip { background: var(--bg2); border-radius: 10px; padding: 12px; text-align: center; }
+.model-chip .mname { font-size: 10px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 0.8px; }
+.model-chip .macc { font-size: 20px; font-weight: 800; color: var(--text); }
+
+.injury-card { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--border); padding: 16px 20px; margin-bottom: 10px; border-radius: 0 12px 12px 0; transition: transform 0.2s; }
+.injury-card:hover { transform: translateX(3px); }
+.injury-card.sev-low { border-left-color: #22c55e; }
+.injury-card.sev-medium { border-left-color: #f59e0b; }
+.injury-card.sev-high { border-left-color: #f97316; }
+.injury-card.sev-critical { border-left-color: #ef4444; }
+.injury-card .sev-badge { font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.injury-card .imeta { font-size: 11px; color: var(--text3); margin-top: 4px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="patient-header">
+    <div class="patient-info">
+        <h1>{{ patient.first_name }} {{ patient.second_name }}</h1>
+        <p class="pid">ID: {{ patient.national_id }} · Age: {{ patient.age }}</p>
+        <span class="badge badge-{{ patient.role }}">{{ patient.role | upper }}</span>
+    </div>
+    <div class="risk-meter card" style="padding:20px 24px;">
+        <div style="display:flex;justify-content:space-between;">
+            <strong>Disease Risk</strong>
+            <span class="badge badge-{{ risk.risk_level | lower }}">{{ risk.risk_level }}</span>
+        </div>
+        <div class="risk-bar-bg">
+            <div class="risk-bar-fill {% if risk.probability < 30 %}risk-low{% elif risk.probability < 60 %}risk-moderate{% elif risk.probability < 80 %}risk-high{% else %}risk-critical{% endif %}" id="riskBarDoc" style="width:{{ risk.probability }}%"></div>
+        </div>
+        <div class="risk-details">{{ risk.probability }}% probability · {{ risk.models|length }} models evaluated</div>
+        {% if risk.models %}
+        <div class="model-grid">
+            {% for name, m in risk.models.items() %}
+            <div class="model-chip">
+                <div class="mname">{{ m.label }}</div>
+                <div class="macc">{{ m.accuracy }}%</div>
+                <div style="font-size:10px;color:var(--text3);">{{ m.probability }}% risk</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Health Profile -->
+<div class="card">
+    <h2>🩺 Health Profile</h2>
+    <form method="POST" action="{{ url_for('patient.update_health') }}">
+        <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+        <input type="hidden" name="patient_id" value="{{ patient.id }}">
+        <input type="hidden" name="redirect_to" value="doctor">
+        <div class="grid grid-3" style="margin-bottom:16px;">
+            {% set fields = [
+                ('age', 'Age', health.age if health else 30, 'number'),
+                ('gender', 'Gender (1=Male,0=Female)', health.gender if health else 1, 'number'),
+                ('bmi', 'BMI', health.bmi if health else 25.0, 'number'),
+                ('daily_steps', 'Daily Steps', health.daily_steps if health else 7000, 'number'),
+                ('sleep_hours', 'Sleep (hrs)', health.sleep_hours if health else 7.0, 'number'),
+                ('water_intake_l', 'Water (L)', health.water_intake_l if health else 2.5, 'number'),
+                ('calories_consumed', 'Calories', health.calories_consumed if health else 2000, 'number'),
+                ('smoker', 'Smoker (0/1)', health.smoker if health else 0, 'number'),
+                ('alcohol', 'Alcohol (0/1)', health.alcohol if health else 0, 'number'),
+                ('resting_hr', 'Resting HR', health.resting_hr if health else 75, 'number'),
+                ('systolic_bp', 'Systolic BP', health.systolic_bp if health else 120, 'number'),
+                ('diastolic_bp', 'Diastolic BP', health.diastolic_bp if health else 80, 'number'),
+                ('cholesterol', 'Cholesterol', health.cholesterol if health else 200, 'number'),
+                ('family_history', 'Family History (0/1)', health.family_history if health else 0, 'number'),
+            ] %}
+            {% for name, label, val, typ in fields %}
+            <div class="form-group">
+                <label>{{ label }}</label>
+                <input type="{{ typ }}" name="{{ name }}" value="{{ val }}" step="any">
+            </div>
+            {% endfor %}
+        </div>
+        <button type="submit" class="btn btn-primary">Update Health Profile →</button>
+    </form>
+</div>
+
+<!-- Injury Records -->
+<div class="grid grid-2">
+    <div>
+        <div class="card">
+            <h2>📋 Injury Records ({{ injuries|length }})</h2>
+            {% for inj in injuries %}
+            <div class="injury-card sev-{{ inj.severity }}">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <strong>{{ inj.injury_type }}</strong>
+                    <span class="sev-badge badge badge-{{ inj.severity }}">{{ inj.severity }}</span>
+                </div>
+                <p style="margin:6px 0;font-size:13px;">{{ inj.injury_description }}</p>
+                <div class="imeta">{{ inj.injury_date }} · by {{ inj.writer_name }}</div>
+                {% if inj.treatment %}
+                <div class="imeta">💊 {{ inj.treatment }}</div>
+                {% endif %}
+                {% if inj.notes %}
+                <div class="imeta">📝 {{ inj.notes }}</div>
+                {% endif %}
+            </div>
+            {% else %}
+            <p style="color:var(--text3);font-size:13px;">No injury records yet.</p>
+            {% endfor %}
+        </div>
+    </div>
+    <div>
+        <!-- Add Injury -->
+        <div class="card" style="margin-bottom:24px;">
+            <h2>➕ Add Injury Record</h2>
+            <form method="POST" action="{{ url_for('doctor.add_injury') }}" id="injuryForm">
+                <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+                <input type="hidden" name="patient_id" value="{{ patient.id }}">
+                <div class="form-group">
+                    <label>Injury Type</label>
+                    <input type="text" name="injury_type" placeholder="e.g. Fracture | Laceration" required>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea name="injury_description" rows="2" placeholder="Describe the injury..." required></textarea>
+                </div>
+                <div class="grid grid-2">
+                    <div class="form-group">
+                        <label>Date</label>
+                        <input type="date" name="injury_date" value="{{ '' | today }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Severity</label>
+                        <select name="severity">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                            <option value="critical">Critical</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Treatment</label>
+                    <input type="text" name="treatment" placeholder="Treatment given">
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <input type="text" name="notes" placeholder="Additional notes">
+                </div>
+                <button type="submit" class="btn btn-primary">Add Injury →</button>
+            </form>
+        </div>
+
+        <!-- QR Scans -->
+        <div class="card">
+            <h2>📱 Recent QR Scans ({{ scans|length }})</h2>
+            {% for s in scans %}
+            <div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;">
+                <strong>{{ s.scan_location or 'Unknown' }}</strong> — {{ s.action_taken }}
+                <span style="color:var(--text3);float:right;">{{ s.scanned_at }}</span>
+            </div>
+            {% else %}
+            <p style="color:var(--text3);font-size:13px;">No scans yet.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var bar = document.getElementById('riskBarDoc');
+    if (bar) {
+        var w = bar.style.width;
+        bar.style.width = '0';
+        setTimeout(function() { bar.style.width = w; }, 300);
+    }
+});
+</script>
+{% endblock %}

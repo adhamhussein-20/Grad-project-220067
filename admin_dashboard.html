@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}Admin Panel — MediTrack{% endblock %}
+{% block extra_css %}
+<style>
+.page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+.page-header h1 { font-size: 22px; font-weight: 800; color: var(--text); letter-spacing: -0.4px; }
+.page-header .sub { font-size: 12px; color: var(--text3); margin-top: 2px; }
+
+.action-strip { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 24px; }
+.action-strip a { display: inline-flex; align-items: center; gap: 5px; padding: 7px 14px; border-radius: 10px; font-size: 12px; font-weight: 600; border: 1px solid var(--border); background: var(--surface); color: var(--text); text-decoration: none; transition: all 0.2s; }
+.action-strip a:hover { background: var(--bg2); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
+.action-strip a.accent { background: var(--text); color: var(--bg); border-color: var(--text); }
+
+.pending-card { background: var(--surface); border: 1.5px solid #f59e0b; border-radius: 14px; padding: 18px 22px; margin-bottom: 24px; }
+.pending-card h3 { font-size: 13px; font-weight: 700; color: #d97706; margin-bottom: 12px; }
+.pending-item { display: flex; align-items: center; justify-content: space-between; padding: 9px 14px; background: var(--bg2); border-radius: 10px; margin-bottom: 6px; gap: 12px; font-size: 12px; }
+.pending-actions { display: flex; gap: 5px; flex-shrink: 0; }
+
+.form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.form-row input, .form-row select { width: 100%; padding: 9px 12px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--bg2); color: var(--text); font-size: 13px; outline: none; font-family: inherit; transition: border-color 0.2s; }
+.form-row input:focus, .form-row select:focus { border-color: var(--text); box-shadow: 0 0 0 3px var(--accent-glow); }
+
+.quick-register-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 22px 24px; margin-bottom: 24px; }
+.quick-register-card h2 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.quick-register-card .qsub { font-size: 12px; color: var(--text3); margin-bottom: 16px; }
+</style>
+{% endblock %}
+
+{% block topbar_title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>MediTrack Admin</h1>
+        <p class="sub">Full system control panel</p>
+    </div>
+    <div class="action-strip">
+        <a href="{{ url_for('admin.users') }}">👥 All Users</a>
+        <a href="{{ url_for('admin.injuries') }}">📋 Injuries</a>
+        <a href="{{ url_for('admin.scans') }}">📱 QR Scans</a>
+        <a href="{{ url_for('admin.analytics') }}">📊 Analytics</a>
+        <a href="{{ url_for('admin.hospitals') }}">🏥 Hospitals</a>
+        <a href="{{ url_for('admin.qrcodes') }}" class="accent">🔳 QR Codes</a>
+    </div>
+</div>
+
+<!-- Stats -->
+<div class="grid grid-4" style="margin-bottom:24px;">
+    {% set stat_items = [
+        ('bi-people', stats.patients, 'Patients'),
+        ('bi-clipboard2-pulse', stats.doctors, 'Doctors'),
+        ('bi-truck', stats.paramedics, 'Paramedics'),
+        ('bi-building-check', stats.hospitals, 'Hospitals'),
+        ('bi-activity', stats.injuries, 'Injuries'),
+        ('bi-qr-code-scan', stats.scans, 'QR Scans'),
+        ('bi-hourglass-split', stats.pending, 'Pending'),
+        ('bi-exclamation-triangle', stats.severity_counts.get('critical', 0), 'Critical'),
+    ] %}
+    {% for icon, val, label in stat_items %}
+    <div class="stat-card animate-in stagger-{{ loop.index }}">
+        <div class="icon"><i class="bi {{ icon }}"></i></div>
+        <div class="num">{{ val }}</div>
+        <div class="label">{{ label }}</div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Pending Approvals -->
+{% if pending %}
+<div class="pending-card">
+    <h3>⏳ Pending Approvals ({{ pending|length }})</h3>
+    {% for u in pending %}
+    <div class="pending-item">
+        <span><strong>{{ u.first_name }} {{ u.second_name }}</strong> — {{ u.username }} ({{ u.national_id }})</span>
+        <div class="pending-actions">
+            <form method="POST" action="{{ url_for('admin.approve_user', uid=u.id) }}" style="margin:0">
+                <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+                <button class="btn btn-success" style="font-size:11px;padding:4px 12px;">✓ Approve</button>
+            </form>
+            <form method="POST" action="{{ url_for('admin.reject_user', uid=u.id) }}" style="margin:0">
+                <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+                <button class="btn btn-danger" style="font-size:11px;padding:4px 12px;">✕ Reject</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Quick Add Hospital -->
+<div class="card">
+    <h2>🏥 Add Hospital</h2>
+    <form method="POST" action="{{ url_for('admin.add_hospital') }}">
+        <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+        <div class="form-row">
+            <input type="text" name="name" placeholder="Hospital Name" required>
+            <input type="text" name="location" placeholder="Location / Address" required>
+            <button type="submit" class="btn btn-primary">Add Hospital →</button>
+        </div>
+    </form>
+</div>
+
+<!-- Quick Register -->
+<div class="quick-register-card">
+    <h2>👤 Quick Register</h2>
+    <p class="qsub">Add a doctor, paramedic, or patient to the system</p>
+    <form method="POST" action="{{ url_for('admin.add_doctor') }}" id="quickRegisterForm">
+        <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+        <input type="hidden" name="set_role" id="regRole" value="doctor">
+        <div class="form-row" style="margin-bottom:10px;">
+            <select id="roleSelect" onchange="document.getElementById('regRole').value=this.value; document.getElementById('quickRegisterForm').action='{{ url_for('admin.add_doctor') }}'.replace('doctor',this.value);">
+                <option value="doctor">🩺 Doctor</option>
+                <option value="paramedic">🚑 Paramedic</option>
+                <option value="patient">🤕 Patient</option>
+            </select>
+            <input type="text" name="national_id" placeholder="National ID (14 digits)" maxlength="14" required>
+            <input type="text" name="username" placeholder="Username" required>
+        </div>
+        <div class="form-row" style="margin-bottom:10px;">
+            <input type="text" name="first_name" placeholder="First Name" required>
+            <input type="text" name="second_name" placeholder="Second Name" required>
+            <input type="number" name="age" placeholder="Age" value="30" min="1" max="120">
+        </div>
+        <div class="form-row">
+            <input type="text" name="phone" placeholder="Phone" required>
+            <input type="password" name="password" placeholder="Password" required>
+            {% if hospitals %}
+            <select name="hospital_id">
+                <option value="">No Hospital</option>
+                {% for h in hospitals %}
+                <option value="{{ h.id }}">{{ h.name }}</option>
+                {% endfor %}
+            </select>
+            {% endif %}
+            <button type="submit" class="btn btn-primary">Register →</button>
+        </div>
+    </form>
+</div>
+
+<!-- Users Table -->
+<div class="card">
+    <h2>👥 All Users ({{ all_users|length }})</h2>
+    <div class="table-wrap">
+        <table>
+            <thead><tr>
+                <th>Name</th><th>National ID</th><th>Role</th><th>Hospital</th><th>Status</th><th>Actions</th>
+            </tr></thead>
+            <tbody>
+            {% for u in all_users %}
+            <tr>
+                <td><strong>{{ u.first_name }} {{ u.second_name }}</strong></td>
+                <td>{{ u.national_id }}</td>
+                <td><span class="badge badge-{{ u.role }}">{{ u.role }}</span></td>
+                <td>{{ u.hospital_name or '—' }}</td>
+                <td>
+                    {% if u.status == 'approved' %}<span class="badge badge-low">✓ Approved</span>
+                    {% elif u.status == 'pending' %}<span class="badge badge-medium">⏳ Pending</span>
+                    {% else %}<span class="badge badge-critical">✕ Rejected</span>{% endif %}
+                </td>
+                <td style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+                    <form method="POST" action="{{ url_for('admin.change_role', uid=u.id) }}" style="margin:0;display:flex;gap:6px;align-items:center;">
+                        <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+                        <select name="role" style="padding:6px 8px;border-radius:8px;font-size:12px;border:1px solid var(--border);background:var(--bg2);color:var(--text);cursor:pointer;">
+                            {% if u.role == 'admin' %}<option value="admin" selected>Admin</option>{% endif %}
+                            <option value="doctor" {% if u.role=='doctor' %}selected{% endif %}>Doctor</option>
+                            <option value="paramedic" {% if u.role=='paramedic' %}selected{% endif %}>Paramedic</option>
+                            <option value="patient" {% if u.role=='patient' %}selected{% endif %}>Patient</option>
+                        </select>
+                        <button class="btn btn-outline" style="font-size:12px;padding:5px 12px;">Save</button>
+                    </form>
+                    {% if u.role != 'admin' %}
+                    <form method="POST" action="{{ url_for('admin.delete_user', uid=u.id) }}" style="margin:0" onsubmit="return confirm('Delete {{ u.first_name }} {{ u.second_name }}?')">
+                        <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+                        <button class="btn btn-danger" style="font-size:12px;padding:5px 10px;">🗑 Delete</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

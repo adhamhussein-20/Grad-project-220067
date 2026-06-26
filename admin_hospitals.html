@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Hospitals — Admin{% endblock %}
+{% block extra_css %}
+<style>
+.hosp-card-3d {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 28px;
+    margin-bottom: 20px;
+    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.06), 0 1px 0 rgba(255,255,255,0.5) inset;
+    transition: transform 0.35s cubic-bezier(0.23,1,0.32,1), box-shadow 0.35s cubic-bezier(0.23,1,0.32,1);
+}
+.hosp-card-3d:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 50px rgba(0,0,0,0.12), 0 1px 0 rgba(255,255,255,0.5) inset;
+}
+.hosp-card-3d::before {
+    content: '';
+    position: absolute;
+    top: -50px; right: -30px;
+    width: 140px; height: 140px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(0,0,0,0.03), transparent);
+    pointer-events: none;
+    transition: transform 0.5s ease;
+}
+.hosp-card-3d:hover::before { transform: scale(1.2) translate(-10px,10px); }
+.hosp-card-3d h2 {
+    font-size: 16px; font-weight: 700; margin-bottom: 20px;
+    display: flex; align-items: center; gap: 10px;
+}
+.hosp-card-3d h2 .hosp-icon {
+    width: 40px; height: 40px; border-radius: 12px;
+    background: var(--bg2); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+}
+.hosp-field {
+    position: relative;
+    margin-bottom: 14px;
+}
+.hosp-field input {
+    width: 100%; padding: 11px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    font-size: 13px; font-family: 'Inter', sans-serif;
+    background: var(--bg2); color: var(--text);
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+    box-sizing: border-box;
+}
+.hosp-field input:focus {
+    border-color: var(--text); background: var(--surface);
+    box-shadow: 0 0 0 3px rgba(0,0,0,0.05);
+}
+.hosp-btn {
+    width: 100%; padding: 11px;
+    background: var(--text); color: var(--bg);
+    border: none; border-radius: 10px;
+    font-size: 13px; font-weight: 700;
+    cursor: pointer; font-family: 'Inter', sans-serif;
+    transition: all 0.25s ease;
+    position: relative; overflow: hidden;
+}
+.hosp-btn::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.12) 50%, transparent 70%);
+    transform: translateX(-100%);
+    transition: transform 0.5s;
+}
+.hosp-btn:hover::after { transform: translateX(100%); }
+.hosp-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+.hosp-btn:active { transform: scale(0.97); }
+[data-theme="dark"] .hosp-card-3d {
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.05) inset;
+}
+[data-theme="dark"] .hosp-card-3d:hover {
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.05) inset;
+}
+[data-theme="dark"] .hosp-field input:focus {
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.06);
+}
+</style>
+{% endblock %}
+{% block content %}
+<div class="container">
+    <h1>🏥 Hospitals ({{ hospitals|length }})</h1>
+    <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline" style="margin-bottom:16px">← Dashboard</a>
+
+    <div class="hosp-card-3d">
+        <h2><span class="hosp-icon">🏥</span> Add Hospital</h2>
+        <form method="POST" action="{{ url_for('admin.add_hospital') }}">
+        <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+                <div class="hosp-field"><input type="text" name="name" placeholder="Hospital Name" required></div>
+                <div class="hosp-field"><input type="text" name="location" placeholder="Location / Address" required></div>
+            </div>
+            <button type="submit" class="hosp-btn">Add Hospital →</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <table><tr><th>ID</th><th>Name</th><th>Location</th><th>Doctors</th><th>Paramedics</th><th>Actions</th></tr>
+        {% for h in hospitals %}<tr>
+            <td>{{ h.id }}</td><td><strong>{{ h.name }}</strong></td><td>{{ h.location }}</td><td>{{ h.doctor_count }}</td><td>{{ h.paramedic_count }}</td>
+            <td style="display:flex;gap:4px">
+                <button class="btn btn-outline" style="font-size:10px;padding:3px 8px" onclick="editHosp({{ h.id }},'{{ h.name|e }}','{{ h.location|e }}')">Edit</button>
+                <form method="POST" action="{{ url_for('admin.delete_hospital', hid=h.id) }}" onsubmit="return confirm('Delete {{ h.name }}?')">
+                    <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+                    <button class="btn btn-danger" style="font-size:10px;padding:3px 8px">🗑</button>
+                </form>
+            </td>
+        </tr>{% endfor %}</table>
+    </div>
+</div>
+<script>
+function editHosp(id,name,loc) {
+    const nn = prompt('Name', name); if(!nn) return;
+    const nl = prompt('Location', loc); if(!nl) return;
+    const f = document.createElement('form'); f.method='POST'; f.action='/admin/hospital/edit/'+id;
+    f.innerHTML = `<input name="name" value="${nn}"><input name="location" value="${nl}">`;
+    document.body.appendChild(f); f.submit();
+}
+</script>
+{% endblock %}

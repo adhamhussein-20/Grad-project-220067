@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Analytics — MediTrack{% endblock %}
+{% block extra_css %}
+<style>
+.inf-yes { background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:4px;font-weight:700;font-size:11px; }
+.inf-no { background:#d1fae5;color:#065f46;padding:2px 8px;border-radius:4px;font-weight:700;font-size:11px; }
+.dead-yes { background:#7f1d1d;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;font-size:11px; }
+.dead-no { background:#d1fae5;color:#065f46;padding:2px 8px;border-radius:4px;font-weight:700;font-size:11px; }
+.exp-yes { background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:4px;font-weight:700;font-size:11px; }
+.exp-no { background:#f8fafc;color:#94a3b8;padding:2px 8px;border-radius:4px;font-size:11px; }
+.toggle-btn { padding:3px 10px;border-radius:4px;border:1px solid #cbd5e1;cursor:pointer;font-size:10px;background:#fff; }
+.toggle-btn.active { background:#2563eb;color:#fff;border-color:#2563eb; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container">
+    <h1>📊 Patient Analytics</h1>
+    <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline" style="margin-bottom:16px">← Dashboard</a>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-3" style="margin-bottom:20px">
+        <div class="stat-card"><div class="num">{{ stats.total_patients }}</div><div class="label">Total Patients</div></div>
+        <div class="stat-card"><div class="num" style="color:#dc2626">{{ stats.infected }}</div><div class="label">Infected ({{ '%.1f'|format(stats.infection_rate) }}%)</div></div>
+        <div class="stat-card"><div class="num" style="color:#7f1d1d">{{ stats.deaths }}</div><div class="label">Deaths ({{ '%.1f'|format(stats.mortality_rate) }}%)</div></div>
+        <div class="stat-card"><div class="num">{{ stats.exposed }}</div><div class="label">Exposed</div></div>
+        <div class="stat-card"><div class="num" style="color:{% if stats.risk_rate > 50 %}#dc2626{% else %}#2563eb{% endif %}">{{ '%.1f'|format(stats.risk_rate) }}%</div><div class="label">Risk Rate</div></div>
+        <div class="stat-card"><div class="num" style="color:{% if stats.relative_risk > 2 %}#dc2626{% else %}#2563eb{% endif %}">{{ stats.relative_risk }}</div><div class="label">Relative Risk (RR)</div></div>
+    </div>
+
+    <!-- Per-Patient Table -->
+    <div class="card">
+        <h2>👥 Per-Patient Status</h2>
+        <div style="overflow-x:auto">
+        <table>
+            <tr>
+                <th>Patient</th><th>National ID</th><th>Age</th>
+                <th>Infected</th><th>Dead</th><th>Exposed</th>
+                <th>Injuries</th><th>Risk</th><th>Actions</th>
+            </tr>
+            {% for p in patients %}
+            <tr>
+                <td><strong>{{ p.first_name }} {{ p.second_name }}</strong></td>
+                <td style="font-size:11px">{{ p.national_id }}</td>
+                <td>{{ p.age }}</td>
+                <td>
+                    <span class="{% if p.infection_status %}inf-yes{% else %}inf-no{% endif %}">{{ p.infection_status }}</span>
+                </td>
+                <td>
+                    <span class="{% if p.death_status %}dead-yes{% else %}dead-no{% endif %}">{{ p.death_status }}</span>
+                </td>
+                <td>
+                    <span class="{% if p.exposed %}exp-yes{% else %}exp-no{% endif %}">{{ p.exposed }}</span>
+                </td>
+                <td>{{ p.injury_count }}</td>
+                <td>
+                    <span class="{% if p.infection_status or p.injury_count > 0 %}inf-yes{% else %}inf-no{% endif %}">
+                        {{ 1 if (p.infection_status or p.injury_count > 0) else 0 }}
+                    </span>
+                </td>
+                <td style="display:flex;gap:3px;flex-wrap:wrap">
+                    <form method="POST" action="{{ url_for('admin.set_infection', pid=p.id) }}" style="margin:0">
+        <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+                        <input type="hidden" name="status" value="{{ 0 if p.infection_status else 1 }}">
+                        <button class="toggle-btn {% if p.infection_status %}active{% endif %}" title="Toggle infection">{{ 'Inf-' if p.infection_status else 'Inf+' }}</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('admin.set_death', pid=p.id) }}" style="margin:0">
+        <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+                        <input type="hidden" name="status" value="{{ 0 if p.death_status else 1 }}">
+                        <button class="toggle-btn {% if p.death_status %}active{% endif %}" title="Toggle death">{{ '💀' if p.death_status else '❤️' }}</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('admin.set_exposed', pid=p.id) }}" style="margin:0">
+        <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+                        <input type="hidden" name="status" value="{{ 0 if p.exposed else 1 }}">
+                        <button class="toggle-btn {% if p.exposed %}active{% endif %}" title="Toggle exposed">{{ 'Exp-' if p.exposed else 'Exp+' }}</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

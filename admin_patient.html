@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}Patient View — Admin{% endblock %}
+{% block topbar_title %}Patient: {{ patient.first_name }} {{ patient.second_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.model-bar-w { background:var(--border); border-radius:99px; height:6px; overflow:hidden; flex:1; }
+.model-bar-f { height:100%; border-radius:99px; background:linear-gradient(90deg,#10b981,#f59e0b,#ef4444); transition:width 1s ease; }
+.model-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.model-row-name { font-size:11px; font-weight:600; color:var(--text2); min-width:135px; }
+.model-row-pct { font-size:12px; font-weight:700; min-width:40px; text-align:right; }
+.h-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:8px; }
+.h-tile { background:var(--bg2); border-radius:8px; padding:10px 12px; border-left:3px solid var(--border); }
+.h-tile .hl { font-size:9px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:0.8px; }
+.h-tile .hv { font-size:13px; font-weight:700; color:var(--text); margin-top:2px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+
+    <div class="page-header reveal">
+        <h1>👤 {{ patient.first_name }} {{ patient.second_name }}</h1>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline">← Back to Dashboard</a>
+            <a href="{{ url_for('patient.qr_view', pid=patient.id) }}" target="_blank"
+               class="btn btn-outline"><i class="bi bi-qr-code-scan"></i> View QR Page</a>
+        </div>
+    </div>
+
+    <div class="grid grid-2" style="margin-bottom:20px;align-items:start">
+
+        <!-- Patient Info -->
+        <div class="card reveal">
+            <h2>Patient Info</h2>
+            <div style="display:flex;align-items:start;gap:16px;flex-wrap:wrap">
+                <div class="qr-box" style="padding:0">
+                    <img src="{{ url_for('patient.patient_qrcode', pid=patient.id) }}" alt="QR"
+                         style="max-width:110px;border:2px solid var(--accent);border-radius:10px;padding:4px;background:#fff">
+                    <div style="font-size:9px;color:var(--text3);margin-top:4px;text-align:center">QR Code</div>
+                </div>
+                <table style="flex:1">
+                    <tr><td style="font-weight:600;color:var(--text2);font-size:12px;padding:6px 10px 6px 0;white-space:nowrap">National ID</td><td>{{ patient.national_id }}</td></tr>
+                    <tr><td style="font-weight:600;color:var(--text2);font-size:12px;padding:6px 10px 6px 0">Username</td><td>{{ patient.username }}</td></tr>
+                    <tr><td style="font-weight:600;color:var(--text2);font-size:12px;padding:6px 10px 6px 0">Phone</td><td>{{ patient.phone }}</td></tr>
+                    <tr><td style="font-weight:600;color:var(--text2);font-size:12px;padding:6px 10px 6px 0">Age</td><td>{{ patient.age or 'N/A' }}</td></tr>
+                    <tr><td style="font-weight:600;color:var(--text2);font-size:12px;padding:6px 10px 6px 0">Status</td>
+                        <td><span class="badge badge-{{ patient.status or 'patient' }}">{{ patient.status or 'approved' }}</span></td></tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- ML Risk Card -->
+        <div class="card reveal">
+            <h2>🤖 AI Disease Risk</h2>
+            {% set pct = risk.probability %}
+            {% if pct < 30 %}{% set rc='#059669' %}{% set rl='Low' %}{% set ri='✅' %}
+            {% elif pct < 60 %}{% set rc='#d97706' %}{% set rl='Moderate' %}{% set ri='⚠️' %}
+            {% else %}{% set rc='#dc2626' %}{% set rl='High' %}{% set ri='🔴' %}{% endif %}
+
+            <div style="display:inline-flex;align-items:center;gap:10px;padding:10px 18px;
+                border-radius:12px;background:{% if pct < 30 %}#d1fae5{% elif pct < 60 %}#fef3c7{% else %}#fee2e2{% endif %};
+                margin-bottom:14px">
+                <span style="font-size:28px;font-weight:900;color:{{ rc }};letter-spacing:-1px">{{ pct|int }}%</span>
+                <div>
+                    <div style="font-weight:700;color:{{ rc }};font-size:14px">{{ ri }} {{ rl }} Risk</div>
+                    <div style="font-size:10px;color:{{ rc }};opacity:0.75">
+                        {% if risk.models %}5-model ensemble{% else %}Injury-based estimate{% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progress bar -->
+            <div style="background:var(--bg2);border-radius:99px;height:7px;overflow:hidden;margin-bottom:14px">
+                <div style="width:{{ pct }}%;height:100%;border-radius:99px;
+                    background:linear-gradient(90deg,#10b981,#f59e0b,#ef4444);
+                    transition:width 1s ease" id="adminRiskBar"></div>
+            </div>
+
+            {% if risk.models %}
+            <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">
+                Model Breakdown
+            </div>
+            {% for name, m in risk.models.items() %}
+            <div class="model-row">
+                <div class="model-row-name">{{ name }}</div>
+                <div class="model-bar-w"><div class="model-bar-f" style="width:{{ m.probability }}%"></div></div>
+                <div class="model-row-pct" style="color:{% if m.probability>=60 %}#dc2626{% elif m.probability>=30 %}#d97706{% else %}#059669{% endif %}">
+                    {{ m.probability }}%
+                </div>
+                <span style="font-size:9px;padding:1px 6px;border-radius:99px;font-weight:700;
+                    {% if m.risk==1 %}background:#fee2e2;color:#991b1b{% else %}background:#d1fae5;color:#065f46{% endif %}">
+                    {{ 'RISK' if m.risk==1 else 'SAFE' }}
+                </span>
+            </div>
+            {% endfor %}
+            {% else %}
+            <p style="font-size:12px;color:var(--text3)">No health profile — estimated from injury records.</p>
+            {% endif %}
+        </div>
+
+    </div>
+
+    <!-- Health Profile (if exists) -->
+    {% if health %}
+    <div class="card reveal">
+        <h2>📋 Health Profile <span style="font-size:12px;font-weight:400;color:var(--text3)">Updated {{ health.updated_at[:10] if health.updated_at else '' }}</span></h2>
+        <div class="h-grid">
+            <div class="h-tile"><div class="hl">Age</div><div class="hv">{{ health.age }} yrs</div></div>
+            <div class="h-tile"><div class="hl">Gender</div><div class="hv">{{ 'Male' if health.gender==1 else 'Female' }}</div></div>
+            <div class="h-tile"><div class="hl">BMI</div><div class="hv">{{ '%.1f'|format(health.bmi) }}</div></div>
+            <div class="h-tile"><div class="hl">Steps/Day</div><div class="hv">{{ '{:,}'.format(health.daily_steps) }}</div></div>
+            <div class="h-tile"><div class="hl">Sleep</div><div class="hv">{{ health.sleep_hours }}h</div></div>
+            <div class="h-tile"><div class="hl">Water</div><div class="hv">{{ health.water_intake_l }}L</div></div>
+            <div class="h-tile"><div class="hl">Calories</div><div class="hv">{{ health.calories_consumed }}</div></div>
+            <div class="h-tile"><div class="hl">Resting HR</div><div class="hv">{{ health.resting_hr }} bpm</div></div>
+            <div class="h-tile"><div class="hl">Systolic BP</div><div class="hv">{{ health.systolic_bp }}</div></div>
+            <div class="h-tile"><div class="hl">Diastolic BP</div><div class="hv">{{ health.diastolic_bp }}</div></div>
+            <div class="h-tile"><div class="hl">Cholesterol</div><div class="hv">{{ health.cholesterol }}</div></div>
+            <div class="h-tile"><div class="hl">Smoker</div><div class="hv" style="color:{% if health.smoker %}#dc2626{% else %}#059669{% endif %}">{{ 'Yes' if health.smoker else 'No' }}</div></div>
+            <div class="h-tile"><div class="hl">Alcohol</div><div class="hv" style="color:{% if health.alcohol %}#dc2626{% else %}#059669{% endif %}">{{ 'Yes' if health.alcohol else 'No' }}</div></div>
+            <div class="h-tile"><div class="hl">Family Hist.</div><div class="hv" style="color:{% if health.family_history %}#dc2626{% else %}#059669{% endif %}">{{ 'Yes' if health.family_history else 'No' }}</div></div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="grid grid-2" style="align-items:start">
+
+        <!-- Add Injury -->
+        <div class="card reveal">
+            <h2>Add Injury Record</h2>
+            <form method="POST" action="{{ url_for('admin.add_injury') }}">
+       <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+                <input type="hidden" name="patient_id" value="{{ patient.id }}">
+                <div class="form-group"><label>Injury Type <span style="color:var(--text3);font-size:10px">(use | for multiple)</span></label>
+                    <input name="injury_type" placeholder="e.g. Fracture | Burn" required></div>
+                <div class="form-group"><label>Description</label>
+                    <textarea name="injury_description" rows="2"></textarea></div>
+                <div class="form-group"><label>Date</label>
+                    <input type="date" name="injury_date" value="{{ ''|today }}" required></div>
+                <div class="form-group"><label>Severity</label>
+                    <select name="severity">
+                        <option value="low">Low</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="high">High</option>
+                        <option value="critical">Critical</option>
+                    </select></div>
+                <div class="form-group"><label>Treatment</label><input name="treatment"></div>
+                <div class="form-group"><label>Notes</label><textarea name="notes" rows="2"></textarea></div>
+                <button class="btn btn-primary"><i class="bi bi-plus-circle"></i> Add Injury</button>
+            </form>
+        </div>
+
+        <!-- Injury Records -->
+        <div class="card reveal">
+            <h2>Injury Records ({{ injuries|length }})</h2>
+            {% if injuries %}
+            <table>
+                <tr><th>Type</th><th>Date</th><th>Severity</th><th>Writer</th></tr>
+                {% for i in injuries %}
+                <tr>
+                    <td><strong>{{ i.injury_type }}</strong><br><span style="font-size:11px;color:var(--text3)">{{ i.injury_description[:60] if i.injury_description else '' }}</span></td>
+                    <td>{{ i.injury_date }}</td>
+                    <td><span class="badge badge-{{ i.severity }}">{{ i.severity }}</span></td>
+                    <td>{{ i.writer_name }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% else %}
+            <p style="color:var(--text3);text-align:center;padding:20px">No injuries recorded.</p>
+            {% endif %}
+        </div>
+
+    </div>
+
+    <!-- QR Scans -->
+    <div class="card reveal">
+        <h2>QR Scans ({{ scans|length }})</h2>
+        {% if scans %}
+        <table>
+            <tr><th>Date & Time</th><th>Paramedic</th><th>Location</th><th>Action</th></tr>
+            {% for s in scans %}
+            <tr>
+                <td>{{ s.scanned_at[:16] }}</td>
+                <td>{{ s.paramedic_name or s.scanned_by or 'N/A' }}</td>
+                <td>{{ s.scan_location or 'N/A' }}</td>
+                <td>{{ s.action_taken }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+        {% else %}
+        <p style="color:var(--text3);text-align:center;padding:20px">No scans recorded.</p>
+        {% endif %}
+    </div>
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var bar = document.getElementById('adminRiskBar');
+    if (bar) {
+        var w = bar.style.width; bar.style.width = '0';
+        setTimeout(function() { bar.style.width = w; }, 300);
+    }
+    document.querySelectorAll('.model-bar-f').forEach(function(b) {
+        var w = b.style.width; b.style.width = '0';
+        setTimeout(function() { b.style.width = w; }, 400);
+    });
+});
+</script>
+{% endblock %}

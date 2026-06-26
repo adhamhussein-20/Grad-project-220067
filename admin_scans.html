@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}QR Scans — Admin{% endblock %}
+{% block content %}
+<div class="container">
+    <h1>🔍 QR Scan Logs</h1>
+    <p>Total: {{ stats.total }} | Today: {{ stats.today }}</p>
+    <div style="margin-bottom:16px;display:flex;gap:10px">
+        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline">← Dashboard</a>
+        <a href="{{ url_for('admin.export', table='qr_scans') }}" class="btn btn-primary">📥 Export CSV</a>
+    </div>
+    <div class="card">
+        <table><tr><th>ID</th><th>Patient</th><th>Paramedic</th><th>Location</th><th>Action</th><th>Date</th><th>Del</th></tr>
+        {% for s in scans %}<tr>
+            <td>{{ s.id }}</td><td><strong>{{ s.patient_name }}</strong></td><td>{{ s.paramedic_name }}</td>
+            <td>{{ s.scan_location }}</td><td>{{ s.action_taken }}</td><td>{{ s.scanned_at[:16] }}</td>
+            <td><form method="POST" action="{{ url_for('admin.delete_scan', sid=s.id) }}" onsubmit="return confirm('Delete?')">
+                    <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+                    <button class="btn btn-danger" style="font-size:10px;padding:3px 6px">🗑</button>
+                </form></td>
+        </tr>{% endfor %}</table>
+    </div>
+</div>
+{% endblock %}

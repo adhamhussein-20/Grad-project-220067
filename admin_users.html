@@ -1,0 +1,482 @@
+{% extends "base.html" %}
+{% block title %}Manage Users — Admin{% endblock %}
+{% block extra_css %}
+<style>
+/* ── Toolbar ── */
+.users-toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 12px; margin-bottom: 20px;
+}
+.users-toolbar h1 { font-size: 22px; font-weight: 800; margin: 0; }
+.users-toolbar .count-badge {
+    background: var(--text); color: var(--bg);
+    padding: 2px 10px; border-radius: 99px;
+    font-size: 12px; font-weight: 700; margin-left: 8px;
+}
+.toolbar-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.search-input {
+    padding: 8px 14px; border: 1.5px solid var(--border);
+    border-radius: 10px; font-size: 12px; font-family: 'Inter', sans-serif;
+    background: var(--bg2); color: var(--text); outline: none;
+    width: 200px; transition: border-color 0.2s, box-shadow 0.2s;
+}
+.search-input:focus { border-color: var(--text); box-shadow: 0 0 0 3px rgba(0,0,0,0.05); }
+.role-filter {
+    padding: 8px 12px; border: 1.5px solid var(--border);
+    border-radius: 10px; font-size: 12px; font-family: 'Inter', sans-serif;
+    background: var(--bg2); color: var(--text); outline: none; cursor: pointer;
+}
+
+/* ── Card Grid ── */
+.users-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 20px;
+}
+
+/* ── 3D User Card ── */
+.user-3d-card {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 0;
+    overflow: hidden;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.05);
+    transition: transform 0.5s cubic-bezier(0.23, 1, 0.32, 1),
+                box-shadow 0.5s cubic-bezier(0.23, 1, 0.32, 1),
+                border-color 0.4s ease;
+    transform-style: preserve-3d;
+    perspective: 800px;
+}
+
+/* Gradient border glow on hover */
+.user-3d-card::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 20px;
+    background: linear-gradient(135deg,
+        transparent 0%,
+        var(--card-accent, rgba(120,120,120,0.3)) 30%,
+        rgba(120,120,120,0.1) 60%,
+        transparent 100%);
+    z-index: -1;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+}
+.user-3d-card:hover::before { opacity: 1; }
+.user-3d-card:hover {
+    transform: translateY(-6px) rotateX(2deg);
+    box-shadow: 0 20px 50px rgba(0,0,0,0.13);
+    border-color: rgba(120,120,120,0.25);
+}
+
+/* Card top accent stripe */
+.user-3d-card .card-accent {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+    background: var(--card-accent, #888);
+    transition: height 0.3s ease;
+}
+.user-3d-card:hover .card-accent { height: 6px; }
+
+/* Card body */
+.card-body {
+    padding: 24px;
+    position: relative;
+    z-index: 1;
+}
+
+/* Header row: avatar + name + role */
+.card-header-row {
+    display: flex; align-items: flex-start; gap: 14px;
+    margin-bottom: 18px;
+}
+.user-avatar-3d {
+    width: 52px; height: 52px;
+    border-radius: 14px;
+    background: var(--bg2);
+    border: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; font-weight: 800;
+    color: var(--text);
+    flex-shrink: 0;
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+    position: relative;
+}
+.user-3d-card:hover .user-avatar-3d {
+    transform: scale(1.06);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    border-color: var(--card-accent, #888);
+}
+/* Avatar ring by role */
+.user-avatar-3d::after {
+    content: '';
+    position: absolute;
+    inset: -3px; border-radius: 16px;
+    border: 2px solid var(--card-accent, transparent);
+    opacity: 0.3;
+    transition: opacity 0.3s ease;
+}
+.user-3d-card:hover .user-avatar-3d::after { opacity: 0.7; }
+
+.card-user-info { flex: 1; min-width: 0; }
+.card-user-name {
+    font-size: 15px; font-weight: 700; color: var(--text);
+    letter-spacing: -0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.card-user-username {
+    font-size: 11px; color: var(--text3); margin-top: 2px; font-family: monospace;
+}
+.card-role-badge {
+    display: inline-block; padding: 3px 10px; border-radius: 99px;
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.5px; margin-top: 6px;
+    background: var(--card-accent, #888); color: #fff;
+}
+
+/* Detail rows */
+.card-details {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+.detail-item {
+    background: var(--bg2);
+    border-radius: 10px;
+    padding: 10px 12px;
+    transition: background 0.2s ease;
+}
+.detail-item:hover { background: var(--border); }
+.detail-label {
+    font-size: 9px; font-weight: 700; color: var(--text3);
+    text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px;
+}
+.detail-value {
+    font-size: 12px; font-weight: 600; color: var(--text);
+    word-break: break-all;
+}
+.detail-value.mono { font-family: monospace; font-size: 11px; }
+
+/* Stats chips */
+.card-stats {
+    display: flex; gap: 8px; margin-bottom: 16px;
+}
+.stat-chip {
+    flex: 1; text-align: center;
+    background: var(--bg2);
+    border-radius: 10px; padding: 8px 6px;
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+.stat-chip:hover { transform: translateY(-2px); background: var(--border); }
+.stat-chip .chip-num {
+    font-size: 16px; font-weight: 800; color: var(--card-accent, var(--text));
+    letter-spacing: -1px;
+}
+.stat-chip .chip-label { font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+
+/* Action buttons */
+.card-actions {
+    display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+}
+.card-action-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--bg2);
+    color: var(--text); cursor: pointer; font-size: 15px;
+    transition: all 0.2s ease; text-decoration: none;
+    flex-shrink: 0;
+}
+.card-action-btn:hover {
+    background: var(--text); color: var(--bg); border-color: var(--text);
+    transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+.card-action-btn.danger:hover { background: #dc2626; color: #fff; border-color: #dc2626; }
+.card-action-btn.warn:hover { background: #f59e0b; color: #fff; border-color: #f59e0b; }
+.card-action-btn.qr-btn:hover { background: #7c3aed; color: #fff; border-color: #7c3aed; }
+
+.card-role-select {
+    padding: 6px 8px; border: 1px solid var(--border);
+    border-radius: 8px; font-size: 12px; font-family: 'Inter', sans-serif;
+    background: var(--bg2); color: var(--text); cursor: pointer; outline: none;
+}
+
+/* Status indicator */
+.status-indicator {
+    position: absolute; top: 20px; right: 20px;
+    width: 8px; height: 8px; border-radius: 50%;
+    z-index: 2;
+    transition: transform 0.3s ease;
+}
+.user-3d-card:hover .status-indicator { transform: scale(1.4); }
+.status-approved { background: #16a34a; box-shadow: 0 0 8px rgba(22,163,74,0.5); }
+.status-pending { background: #f59e0b; box-shadow: 0 0 8px rgba(245,158,11,0.5); animation: statusPulse 1.5s ease-in-out infinite; }
+.status-rejected { background: #dc2626; }
+@keyframes statusPulse {
+    0%, 100% { box-shadow: 0 0 4px rgba(245,158,11,0.3); }
+    50% { box-shadow: 0 0 14px rgba(245,158,11,0.7); }
+}
+
+/* No results */
+.no-results {
+    grid-column: 1 / -1;
+    text-align: center; padding: 60px 20px;
+    color: var(--text3); font-size: 14px;
+}
+
+/* Modal overlay */
+.modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5); z-index: 1000;
+    justify-content: center; align-items: center;
+    backdrop-filter: blur(4px);
+}
+.modal-overlay.show { display: flex; }
+.modal-box {
+    background: var(--surface); border-radius: 20px;
+    padding: 28px; max-width: 480px; width: 90%;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.3);
+    animation: modalPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes modalPop { from { opacity:0; transform:scale(0.9) translateY(20px); } to { opacity:1; transform:scale(1) translateY(0); } }
+.modal-box h3 { font-size: 16px; font-weight: 700; margin-bottom: 18px; }
+.modal-field { margin-bottom: 12px; }
+.modal-field label { display: block; font-size: 10px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
+.modal-field input, .modal-field select {
+    width: 100%; padding: 9px 12px; border: 1.5px solid var(--border);
+    border-radius: 9px; font-size: 13px; font-family: 'Inter', sans-serif;
+    background: var(--bg2); color: var(--text); outline: none;
+    transition: border-color 0.2s; box-sizing: border-box;
+}
+.modal-field input:focus, .modal-field select:focus { border-color: var(--text); }
+.modal-actions { display: flex; gap: 8px; margin-top: 18px; justify-content: flex-end; }
+.modal-btn {
+    padding: 9px 18px; border-radius: 9px; font-size: 12px;
+    font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif;
+    border: 1px solid var(--border); transition: all 0.2s;
+}
+.modal-btn.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+.modal-btn.primary:hover { opacity: 0.85; transform: translateY(-1px); }
+.modal-btn.cancel { background: transparent; color: var(--text2); }
+.modal-btn.cancel:hover { background: var(--bg2); }
+
+/* Reveal stagger */
+.user-3d-card { opacity: 0; transform: translateY(30px); }
+.user-3d-card.revealed { animation: cardReveal 0.5s cubic-bezier(0.23,1,0.32,1) forwards; }
+@keyframes cardReveal { to { opacity: 1; transform: translateY(0); } }
+
+/* Dark */
+[data-theme="dark"] .user-3d-card { box-shadow: 0 2px 16px rgba(0,0,0,0.2); }
+[data-theme="dark"] .user-3d-card:hover { box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+[data-theme="dark"] .search-input:focus { box-shadow: 0 0 0 3px rgba(255,255,255,0.06); }
+
+/* Responsive */
+@media (max-width: 480px) {
+    .users-grid { grid-template-columns: 1fr; }
+    .users-toolbar { flex-direction: column; align-items: flex-start; }
+    .search-input { width: 100%; }
+}
+</style>
+{% endblock %}
+{% block content %}
+<div class="container">
+
+    <!-- ── Toolbar ── -->
+    <div class="users-toolbar">
+        <h1>👥 Manage Users<span class="count-badge">{{ users|length }}</span></h1>
+        <div class="toolbar-right">
+            <input type="text" class="search-input" id="userSearch" placeholder="🔍 Search name, ID, username…" oninput="filterCards()">
+            <select class="role-filter" id="roleFilter" onchange="filterCards()">
+                <option value="">All Roles</option>
+                <option value="admin">Admin</option>
+                <option value="doctor">Doctor</option>
+                <option value="paramedic">Paramedic</option>
+                <option value="patient">Patient</option>
+            </select>
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline">← Dashboard</a>
+            <a href="{{ url_for('admin.export', table='users') }}" class="btn btn-primary">📥 Export CSV</a>
+        </div>
+    </div>
+
+    <!-- ── 3D User Card Grid ── -->
+    <div class="users-grid" id="usersGrid">
+        {% for u in users %}
+        <div class="user-3d-card" data-role="{{ u.role }}" data-status="{{ u.status }}"
+             data-search="{{ u.first_name }} {{ u.second_name }} {{ u.national_id }} {{ u.username }}"
+             style="--card-accent: {% if u.role == 'admin' %}#7c3aed{% elif u.role == 'doctor' %}#2563eb{% elif u.role == 'paramedic' %}#059669{% else %}#d97706{% endif %}; animation-delay: {{ loop.index0 * 0.05 }}s">
+
+            <div class="card-accent"></div>
+            <div class="status-indicator status-{{ u.status }}"></div>
+
+            <div class="card-body">
+                <!-- Header -->
+                <div class="card-header-row">
+                    <div class="user-avatar-3d">{{ u.first_name[0]|upper }}{{ u.second_name[0]|upper }}</div>
+                    <div class="card-user-info">
+                        <div class="card-user-name">{{ u.first_name }} {{ u.second_name }}</div>
+                        <div class="card-user-username">@{{ u.username }}</div>
+                        <span class="card-role-badge">{{ u.role }}</span>
+                    </div>
+                </div>
+
+                <!-- Details -->
+                <div class="card-details">
+                    <div class="detail-item">
+                        <div class="detail-label">National ID</div>
+                        <div class="detail-value mono">{{ u.national_id }}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Phone</div>
+                        <div class="detail-value">{{ u.phone }}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Hospital</div>
+                        <div class="detail-value">{{ u.hospital_name or '—' }}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Status</div>
+                        <div class="detail-value" style="{% if u.status == 'pending' %}color:#f59e0b{% elif u.status == 'rejected' %}color:#dc2626{% else %}color:#16a34a{% endif %}">{{ u.status.title() }}</div>
+                    </div>
+                </div>
+
+                <!-- Stats -->
+                <div class="card-stats">
+                    <div class="stat-chip">
+                        <div class="chip-num">{{ u.injury_count }}</div>
+                        <div class="chip-label">Injuries</div>
+                    </div>
+                    <div class="stat-chip">
+                        <div class="chip-num">{{ u.scan_count }}</div>
+                        <div class="chip-label">Scans</div>
+                    </div>
+                    <div class="stat-chip">
+                        <div class="chip-num">{{ u.age }}</div>
+                        <div class="chip-label">Age</div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="card-actions">
+                    <button class="card-action-btn" title="Edit"
+                        onclick="openEditModal({{ u.id }},'{{ u.first_name|e }}','{{ u.second_name|e }}','{{ u.national_id }}','{{ u.username }}','{{ u.phone }}','{{ u.hospital_id or '' }}','{{ u.age }}')">
+                        ✏️
+                    </button>
+                    <form method="POST" action="{{ url_for('admin.reset_password', uid=u.id) }}" style="margin:0" onsubmit="var pw=prompt('New password?','changeme123');if(!pw)return false;var inp=document.createElement('input');inp.type='hidden';inp.name='new_password';inp.value=pw;this.appendChild(inp);return true">
+                        <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+                        <button class="card-action-btn warn" title="Reset Password">🔑</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('admin.change_role', uid=u.id) }}" style="margin:0;display:flex;gap:4px;align-items:center">
+       <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+                        <select name="role" class="card-role-select">
+                            <option value="patient" {% if u.role=='patient' %}selected{% endif %}>Patient</option>
+                            <option value="paramedic" {% if u.role=='paramedic' %}selected{% endif %}>Paramedic</option>
+                            <option value="doctor" {% if u.role=='doctor' %}selected{% endif %}>Doctor</option>
+                            {% if u.role == 'admin' %}<option value="admin" selected>Admin</option>{% endif %}
+                        </select>
+                        <button class="card-action-btn" title="Save Role" style="width:26px;height:26px;font-size:10px">✓</button>
+                    </form>
+                    <a href="{{ url_for('patient.qr_view', pid=u.id) }}" target="_blank" class="card-action-btn qr-btn" title="View QR Code">▣</a>
+                    {% if u.role != 'admin' %}
+                    <form method="POST" action="{{ url_for('admin.delete_user', uid=u.id) }}" style="margin:0" onsubmit="return confirm('Delete {{ u.first_name }} {{ u.second_name }}? This removes ALL their data.')">
+                        <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+                        <button class="card-action-btn danger" title="Delete User">🗑</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        {% if not users %}
+        <div class="no-results">No users found.</div>
+        {% endif %}
+    </div>
+
+    <div class="no-results" id="noResults" style="display:none">No users match your search.</div>
+</div>
+
+<!-- ── Edit Modal ── -->
+<div class="modal-overlay" id="editModal">
+    <div class="modal-box">
+        <h3>✏️ Edit User</h3>
+        <form method="POST" id="editForm" action="">
+       <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+            <div class="modal-field"><label>First Name</label><input type="text" name="first_name" id="editFirstName" required></div>
+            <div class="modal-field"><label>Second Name</label><input type="text" name="second_name" id="editSecondName" required></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                <div class="modal-field"><label>National ID</label><input type="text" name="national_id" id="editNid" maxlength="14" required></div>
+                <div class="modal-field"><label>Username</label><input type="text" name="username" id="editUsername" required></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                <div class="modal-field"><label>Phone</label><input type="text" name="phone" id="editPhone" required></div>
+                <div class="modal-field"><label>Age</label><input type="number" name="age" id="editAge" value="30" min="1" max="120"></div>
+            </div>
+            <div class="modal-field"><label>New Password (leave blank to keep)</label><input type="text" name="new_password" id="editPassword" placeholder="Optional"></div>
+            <input type="hidden" name="hospital_id" id="editHid">
+            <div class="modal-actions">
+                <button type="button" class="modal-btn cancel" onclick="closeEditModal()">Cancel</button>
+                <button type="submit" class="modal-btn primary">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Card reveal stagger ──
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.user-3d-card').forEach(function(card, i) {
+        setTimeout(function() { card.classList.add('revealed'); }, i * 60);
+    });
+});
+
+// ── Search & Filter ──
+function filterCards() {
+    var q = document.getElementById('userSearch').value.toLowerCase();
+    var role = document.getElementById('roleFilter').value;
+    var cards = document.querySelectorAll('.user-3d-card');
+    var visible = 0;
+    cards.forEach(function(card) {
+        var text = card.dataset.search.toLowerCase();
+        var cardRole = card.dataset.role;
+        var show = (!q || text.indexOf(q) !== -1) && (!role || cardRole === role);
+        card.style.display = show ? '' : 'none';
+        if (show) visible++;
+    });
+    var grid = document.getElementById('usersGrid');
+    var noRes = document.getElementById('noResults');
+    if (visible === 0) {
+        noRes.style.display = 'block';
+    } else {
+        noRes.style.display = 'none';
+    }
+}
+
+// ── Edit Modal ──
+function openEditModal(id, fn, sn, nid, un, ph, hid, age) {
+    document.getElementById('editForm').action = '/admin/user/edit/' + id;
+    document.getElementById('editFirstName').value = fn;
+    document.getElementById('editSecondName').value = sn;
+    document.getElementById('editNid').value = nid;
+    document.getElementById('editUsername').value = un;
+    document.getElementById('editPhone').value = ph;
+    document.getElementById('editAge').value = age || 30;
+    document.getElementById('editHid').value = hid;
+    document.getElementById('editPassword').value = '';
+    document.getElementById('editModal').classList.add('show');
+}
+function closeEditModal() {
+    document.getElementById('editModal').classList.remove('show');
+}
+document.getElementById('editModal').addEventListener('click', function(e) {
+    if (e.target === this) closeEditModal();
+});
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeEditModal();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,437 @@
+{% extends "base.html" %}
+{% block title %}My Health Dashboard — MediTrack{% endblock %}
+{% block topbar_title %}My Health Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Risk Gauge ── */
+.gauge-wrap { position: relative; width: 160px; height: 90px; margin: 0 auto 12px; overflow: hidden; }
+.gauge-bg { width: 160px; height: 160px; border-radius: 50%; background: conic-gradient(
+    #e5e7eb 0deg, #e5e7eb 180deg, transparent 180deg); position: absolute; top: 0; left: 0; }
+.gauge-fill { width: 160px; height: 160px; border-radius: 50%; position: absolute; top: 0; left: 0;
+    background: conic-gradient(var(--gauge-color, #e5e7eb) 0deg, var(--gauge-deg, 0deg), #e5e7eb 0deg);
+    transition: all 1.2s cubic-bezier(0.34,1.56,0.64,1); }
+.gauge-cover { position: absolute; width: 110px; height: 110px; background: var(--surface);
+    border-radius: 50%; bottom: -25px; left: 25px; }
+.gauge-num { position: absolute; bottom: 0; left: 0; right: 0; text-align: center;
+    font-size: 26px; font-weight: 900; color: var(--text); letter-spacing: -1px; }
+
+/* ── Model cards ── */
+.model-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 16px; }
+.model-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px 16px; text-align: center; transition: all 0.25s; }
+.model-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.08); }
+.model-name { font-size: 10px; font-weight: 700; color: var(--text3); text-transform: uppercase;
+    letter-spacing: 0.8px; margin-bottom: 8px; }
+.model-prob { font-size: 22px; font-weight: 900; letter-spacing: -1px; line-height: 1; }
+.model-acc { font-size: 9px; color: var(--text3); margin-top: 4px; }
+.model-risk-badge { display: inline-block; padding: 2px 8px; border-radius: 99px;
+    font-size: 9px; font-weight: 700; text-transform: uppercase; margin-top: 4px; }
+.mrbg-safe { background: #d1fae5; color: #065f46; }
+.mrbg-risk { background: #fee2e2; color: #991b1b; }
+
+/* ── Progress bar ── */
+.risk-bar-wrap { background: var(--bg2); border-radius: 99px; height: 8px;
+    overflow: hidden; margin: 8px 0; }
+.risk-bar { height: 100%; border-radius: 99px;
+    background: linear-gradient(90deg, #10b981, #f59e0b, #ef4444);
+    transition: width 1.2s cubic-bezier(0.34,1.56,0.64,1); }
+
+/* ── Health form ── */
+.health-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+.toggle-group { display: flex; gap: 8px; }
+.toggle-btn { flex: 1; padding: 9px; border-radius: 8px; border: 1.5px solid var(--border);
+    background: var(--surface); color: var(--text); font-size: 13px; font-weight: 600;
+    cursor: pointer; text-align: center; transition: all 0.2s; }
+.toggle-btn.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.toggle-btn input { display: none; }
+
+/* ── Risk level colors ── */
+.level-low      { color: #059669; }
+.level-moderate { color: #d97706; }
+.level-high     { color: #dc2626; }
+.level-unknown  { color: var(--text3); }
+
+.risk-hero { text-align: center; padding: 20px 16px 8px; }
+.risk-hero .level-txt { font-size: 13px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 1.5px; margin-top: 6px; }
+.risk-hero .prob-txt { font-size: 11px; color: var(--text3); margin-top: 4px; }
+
+/* ── Section toggle ── */
+.collapsible-btn { display: flex; align-items: center; justify-content: space-between;
+    cursor: pointer; user-select: none; width: 100%; background: none; border: none;
+    padding: 0; color: var(--text); font-family: inherit; }
+.collapsible-btn .chevron { transition: transform 0.3s; font-size: 14px; }
+.collapsible-btn.open .chevron { transform: rotate(180deg); }
+.collapsible-body { overflow: hidden; transition: max-height 0.4s ease, opacity 0.3s ease;
+    max-height: 0; opacity: 0; }
+.collapsible-body.open { max-height: 1200px; opacity: 1; }
+
+/* ── No data state ── */
+.no-data-banner { text-align: center; padding: 32px 16px; background: var(--bg2);
+    border-radius: 12px; border: 2px dashed var(--border); }
+.no-data-icon { font-size: 48px; margin-bottom: 12px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+
+    <!-- Page Header -->
+    <div class="page-header reveal">
+        <h1>🩺 My Health Dashboard</h1>
+        <p>{{ patient.first_name }} {{ patient.second_name }} &nbsp;·&nbsp; ID: {{ patient.national_id }}</p>
+    </div>
+
+    <div class="grid grid-2" style="align-items:start">
+
+        <!-- ── Left Column ── -->
+        <div>
+
+            <!-- QR Code Card -->
+            <div class="card reveal qr-box">
+                <h2 style="margin-bottom:10px">📱 My QR Code</h2>
+                <p style="color:var(--text3);font-size:12px;margin-bottom:14px">Paramedics scan this to view your full medical profile</p>
+                <img src="{{ url_for('patient.patient_qrcode', pid=session.user_id) }}"
+                     alt="QR Code"
+                     style="border:3px solid var(--accent);border-radius:14px;padding:8px;background:#fff;max-width:200px;width:100%"
+                     onerror="this.parentElement.innerHTML='<div style=\'padding:20px;color:var(--text3)\'>QR generation failed — check server logs</div>'">
+                <p style="margin-top:10px;font-size:11px;color:var(--text3)">
+                    {{ patient.first_name }} {{ patient.second_name }} &nbsp;·&nbsp; {{ patient.national_id }}
+                </p>
+                <a href="{{ url_for('patient.qr_view', pid=session.user_id) }}"
+                   target="_blank" class="btn btn-outline" style="margin-top:12px;font-size:12px">
+                    <i class="bi bi-box-arrow-up-right"></i> View Public QR Page
+                </a>
+            </div>
+
+            <!-- Injury History -->
+            <div class="card reveal">
+                <h2>📋 Injury History <span style="color:var(--text3);font-weight:400;font-size:13px">({{ injuries|length }})</span></h2>
+                {% if injuries %}
+                {% for inj in injuries %}
+                <div style="background:var(--bg2);border-left:4px solid
+                    {% if inj.severity=='critical' %}#dc2626{% elif inj.severity=='high' %}#f59e0b
+                    {% elif inj.severity=='medium' %}#3b82f6{% else %}#10b981{% endif %};
+                    padding:14px 18px;margin-bottom:10px;border-radius:0 10px 10px 0">
+                    <div style="display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:8px">
+                        <div>
+                            <div style="font-size:15px;font-weight:700;color:var(--text)">{{ inj.injury_type }}</div>
+                            <div style="font-size:11px;color:var(--text3)">{{ inj.injury_date }}</div>
+                        </div>
+                        <span class="badge badge-{{ inj.severity }}" style="font-size:11px;padding:4px 12px">{{ inj.severity.upper() }}</span>
+                    </div>
+                    {% if inj.injury_description %}
+                    <div style="margin-top:8px;font-size:12px;color:var(--text2)">{{ inj.injury_description }}</div>
+                    {% endif %}
+                    <div style="margin-top:6px;font-size:10px;color:var(--text3)">
+                        By: <strong>{{ inj.writer_name }}</strong> ({{ inj.writer_role }})
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <p style="color:var(--text3);text-align:center;padding:24px">No injury records yet.</p>
+                {% endif %}
+            </div>
+
+            <!-- QR Scan History -->
+            {% if scans %}
+            <div class="card reveal">
+                <h2>🔍 Recent QR Scans <span style="color:var(--text3);font-weight:400;font-size:13px">({{ scans|length }})</span></h2>
+                <table>
+                    <tr><th>Date</th><th>Paramedic</th><th>Location</th><th>Action</th></tr>
+                    {% for s in scans %}
+                    <tr>
+                        <td style="white-space:nowrap">{{ s.scanned_at[:16] }}</td>
+                        <td><strong>{{ s.paramedic_name }}</strong></td>
+                        <td>{{ s.scan_location or 'N/A' }}</td>
+                        <td>{{ s.action_taken }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            {% endif %}
+
+        </div><!-- /left -->
+
+        <!-- ── Right Column ── -->
+        <div>
+
+            <!-- Disease Risk Assessment Card -->
+            <div class="card reveal">
+                <h2 style="margin-bottom:0">🤖 AI Disease Risk Assessment</h2>
+                <p style="font-size:11px;color:var(--text3);margin-bottom:16px;margin-top:4px">
+                    5-model weighted ensemble · Trained on 100k patient records
+                </p>
+
+                {% if risk.models %}
+                <!-- Gauge -->
+                {% set pct = risk.probability %}
+                {% set gauge_deg = (pct / 100 * 180)|int %}
+                {% if pct < 30 %}
+                    {% set g_color = '#059669' %}{% set level_cls = 'level-low' %}
+                {% elif pct < 60 %}
+                    {% set g_color = '#d97706' %}{% set level_cls = 'level-moderate' %}
+                {% else %}
+                    {% set g_color = '#dc2626' %}{% set level_cls = 'level-high' %}
+                {% endif %}
+
+                <div class="risk-hero">
+                    <div class="gauge-wrap">
+                        <div class="gauge-bg"></div>
+                        <div class="gauge-fill" id="gaugeFill"
+                             style="--gauge-color:{{ g_color }};--gauge-deg:{{ gauge_deg }}deg"></div>
+                        <div class="gauge-cover"></div>
+                        <div class="gauge-num {{ level_cls }}" id="gaugeNum">{{ pct|int }}%</div>
+                    </div>
+                    <div class="risk-bar-wrap">
+                        <div class="risk-bar" id="riskBar" style="width:{{ pct }}%"></div>
+                    </div>
+                    <div class="level-txt {{ level_cls }}">
+                        {% if risk.risk_level == 'Low' %}✅ Low Risk
+                        {% elif risk.risk_level == 'Moderate' %}⚠️ Moderate Risk
+                        {% elif risk.risk_level == 'High' %}🔴 High Risk
+                        {% else %}❓ {{ risk.risk_level }}{% endif %}
+                    </div>
+                    <div class="prob-txt">Ensemble probability: {{ pct }}% &nbsp;|&nbsp; Decision: {{ risk.risk_level }}</div>
+                </div>
+
+                <!-- Per-Model Breakdown -->
+                <div style="margin-top:16px">
+                    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">
+                        Model Breakdown
+                    </div>
+                    <div class="model-grid">
+                        {% for name, m in risk.models.items() %}
+                        <div class="model-card">
+                            <div class="model-name">{{ m.label }}</div>
+                            <div class="model-prob {% if m.probability >= 60 %}level-high{% elif m.probability >= 30 %}level-moderate{% else %}level-low{% endif %}">
+                                {{ m.probability }}%
+                            </div>
+                            <div class="model-risk-badge {% if m.risk == 1 %}mrbg-risk{% else %}mrbg-safe{% endif %}">
+                                {{ 'At Risk' if m.risk == 1 else 'Safe' }}
+                            </div>
+                            <div class="model-acc">Acc: {{ m.accuracy }}%</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                {% else %}
+                <!-- No health data yet -->
+                <div class="no-data-banner">
+                    <div class="no-data-icon">🏥</div>
+                    <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:8px">
+                        No Health Profile Yet
+                    </div>
+                    <div style="font-size:13px;color:var(--text3);margin-bottom:16px">
+                        Fill in your health parameters below to get your personalized
+                        AI risk assessment from 5 machine learning models.
+                    </div>
+                    <button class="btn btn-primary" onclick="openHealthForm()">
+                        <i class="bi bi-heart-pulse"></i> Enter Health Data
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Health Profile Form -->
+            <div class="card reveal" id="healthCard">
+                <button type="button" class="collapsible-btn {% if not health %}open{% endif %}" id="healthToggle"
+                        onclick="toggleHealthForm()">
+                    <h2 style="margin:0;font-size:16px">⚙️ Health Profile
+                        {% if health %}
+                        <span style="font-size:10px;font-weight:500;color:var(--text3);margin-left:8px">
+                            Updated {{ health.updated_at[:10] if health.updated_at else '' }}
+                        </span>
+                        {% endif %}
+                    </h2>
+                    <i class="bi bi-chevron-down chevron"></i>
+                </button>
+
+                <div class="collapsible-body {% if not health %}open{% endif %}" id="healthBody">
+                    <div style="height:16px"></div>
+                    <form method="POST" action="{{ url_for('patient.update_health') }}" id="healthForm">
+       <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+                        <input type="hidden" name="patient_id" value="{{ session.user_id }}">
+
+                        <div class="health-form-grid">
+                            <!-- Age -->
+                            <div class="form-group">
+                                <label>Age (years)</label>
+                                <input type="number" name="age" min="1" max="120" required
+                                       value="{{ health.age if health else patient.age or 30 }}">
+                            </div>
+                            <!-- Gender -->
+                            <div class="form-group">
+                                <label>Gender</label>
+                                <select name="gender">
+                                    <option value="1" {% if health and health.gender==1 %}selected{% endif %}>Male</option>
+                                    <option value="0" {% if health and health.gender==0 %}selected{% endif %}>Female</option>
+                                </select>
+                            </div>
+                            <!-- BMI -->
+                            <div class="form-group">
+                                <label>BMI <span style="color:var(--text3);font-size:10px">(kg/m²)</span></label>
+                                <input type="number" name="bmi" step="0.1" min="10" max="70" required
+                                       value="{{ '%.1f'|format(health.bmi) if health else '25.0' }}">
+                            </div>
+                            <!-- Daily Steps -->
+                            <div class="form-group">
+                                <label>Daily Steps</label>
+                                <input type="number" name="daily_steps" min="0" max="50000" required
+                                       value="{{ health.daily_steps if health else 7000 }}">
+                            </div>
+                            <!-- Sleep -->
+                            <div class="form-group">
+                                <label>Sleep Hours / Night</label>
+                                <input type="number" name="sleep_hours" step="0.5" min="0" max="24" required
+                                       value="{{ '%.1f'|format(health.sleep_hours) if health else '7.0' }}">
+                            </div>
+                            <!-- Water -->
+                            <div class="form-group">
+                                <label>Water Intake (L/day)</label>
+                                <input type="number" name="water_intake_l" step="0.1" min="0" max="20" required
+                                       value="{{ '%.1f'|format(health.water_intake_l) if health else '2.5' }}">
+                            </div>
+                            <!-- Calories -->
+                            <div class="form-group">
+                                <label>Calories / Day</label>
+                                <input type="number" name="calories_consumed" min="0" max="10000" required
+                                       value="{{ health.calories_consumed if health else 2000 }}">
+                            </div>
+                            <!-- Resting HR -->
+                            <div class="form-group">
+                                <label>Resting Heart Rate <span style="color:var(--text3);font-size:10px">(bpm)</span></label>
+                                <input type="number" name="resting_hr" min="30" max="250" required
+                                       value="{{ health.resting_hr if health else 75 }}">
+                            </div>
+                            <!-- Systolic BP -->
+                            <div class="form-group">
+                                <label>Systolic BP <span style="color:var(--text3);font-size:10px">(mmHg)</span></label>
+                                <input type="number" name="systolic_bp" min="60" max="300" required
+                                       value="{{ health.systolic_bp if health else 120 }}">
+                            </div>
+                            <!-- Diastolic BP -->
+                            <div class="form-group">
+                                <label>Diastolic BP <span style="color:var(--text3);font-size:10px">(mmHg)</span></label>
+                                <input type="number" name="diastolic_bp" min="40" max="200" required
+                                       value="{{ health.diastolic_bp if health else 80 }}">
+                            </div>
+                            <!-- Cholesterol -->
+                            <div class="form-group">
+                                <label>Cholesterol <span style="color:var(--text3);font-size:10px">(mg/dL)</span></label>
+                                <input type="number" name="cholesterol" min="50" max="500" required
+                                       value="{{ health.cholesterol if health else 200 }}">
+                            </div>
+                        </div>
+
+                        <!-- Toggle fields (smoker, alcohol, family_history) -->
+                        <div class="grid grid-3" style="gap:12px;margin-top:4px">
+                            <div class="form-group">
+                                <label>Smoker</label>
+                                <div class="toggle-group">
+                                    <label class="toggle-btn {% if health and health.smoker==0 or not health %}active{% endif %}" id="tbSmNo">
+                                        <input type="radio" name="smoker" value="0"
+                                               {% if not health or health.smoker==0 %}checked{% endif %}
+                                               onchange="setToggle('sm','no')"> No
+                                    </label>
+                                    <label class="toggle-btn {% if health and health.smoker==1 %}active{% endif %}" id="tbSmYes">
+                                        <input type="radio" name="smoker" value="1"
+                                               {% if health and health.smoker==1 %}checked{% endif %}
+                                               onchange="setToggle('sm','yes')"> Yes
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Alcohol</label>
+                                <div class="toggle-group">
+                                    <label class="toggle-btn {% if health and health.alcohol==0 or not health %}active{% endif %}" id="tbAlNo">
+                                        <input type="radio" name="alcohol" value="0"
+                                               {% if not health or health.alcohol==0 %}checked{% endif %}
+                                               onchange="setToggle('al','no')"> No
+                                    </label>
+                                    <label class="toggle-btn {% if health and health.alcohol==1 %}active{% endif %}" id="tbAlYes">
+                                        <input type="radio" name="alcohol" value="1"
+                                               {% if health and health.alcohol==1 %}checked{% endif %}
+                                               onchange="setToggle('al','yes')"> Yes
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Family History</label>
+                                <div class="toggle-group">
+                                    <label class="toggle-btn {% if health and health.family_history==0 or not health %}active{% endif %}" id="tbFhNo">
+                                        <input type="radio" name="family_history" value="0"
+                                               {% if not health or health.family_history==0 %}checked{% endif %}
+                                               onchange="setToggle('fh','no')"> No
+                                    </label>
+                                    <label class="toggle-btn {% if health and health.family_history==1 %}active{% endif %}" id="tbFhYes">
+                                        <input type="radio" name="family_history" value="1"
+                                               {% if health and health.family_history==1 %}checked{% endif %}
+                                               onchange="setToggle('fh','yes')"> Yes
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-cpu"></i>
+                                {{ 'Update Risk Assessment' if health else 'Calculate My Risk' }}
+                            </button>
+                            {% if health %}
+                            <button type="button" class="btn btn-outline" onclick="toggleHealthForm()">
+                                Cancel
+                            </button>
+                            {% endif %}
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </div><!-- /right -->
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleHealthForm() {
+    const btn  = document.getElementById('healthToggle');
+    const body = document.getElementById('healthBody');
+    btn.classList.toggle('open');
+    body.classList.toggle('open');
+}
+
+function openHealthForm() {
+    const btn  = document.getElementById('healthToggle');
+    const body = document.getElementById('healthBody');
+    btn.classList.add('open');
+    body.classList.add('open');
+    document.getElementById('healthCard').scrollIntoView({ behavior: 'smooth' });
+}
+
+function setToggle(group, val) {
+    var map = {
+        sm: { no: 'tbSmNo', yes: 'tbSmYes' },
+        al: { no: 'tbAlNo', yes: 'tbAlYes' },
+        fh: { no: 'tbFhNo', yes: 'tbFhYes' },
+    };
+    var ids = map[group];
+    if (!ids) return;
+    document.getElementById(ids.no).classList.toggle('active', val === 'no');
+    document.getElementById(ids.yes).classList.toggle('active', val === 'yes');
+}
+
+// Animate risk bar on load
+document.addEventListener('DOMContentLoaded', function () {
+    var bar = document.getElementById('riskBar');
+    if (bar) {
+        var w = bar.style.width;
+        bar.style.width = '0';
+        setTimeout(function () { bar.style.width = w; }, 300);
+    }
+});
+</script>
+{% endblock %}

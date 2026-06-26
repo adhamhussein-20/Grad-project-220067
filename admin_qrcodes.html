@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+{% block title %}QR Codes — All Patients{% endblock %}
+{% block extra_css %}
+<style>
+.qr-toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 12px; margin-bottom: 24px;
+}
+.qr-toolbar h1 { font-size: 22px; font-weight: 800; margin: 0; }
+.qr-count { background: var(--text); color: var(--bg); padding: 2px 10px; border-radius: 99px; font-size: 12px; font-weight: 700; margin-left: 8px; }
+
+.qr-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+/* QR Card */
+.qr-card {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.05);
+    transition: transform 0.4s cubic-bezier(0.23, 1, 0.32, 1),
+                box-shadow 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+}
+.qr-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 16px 40px rgba(0,0,0,0.12);
+}
+
+/* Top accent bar */
+.qr-card-accent {
+    height: 5px;
+    background: linear-gradient(90deg, #2563eb, #7c3aed, #d946ef);
+    transition: height 0.3s ease;
+}
+.qr-card:hover .qr-card-accent { height: 8px; }
+
+/* Card body */
+.qr-card-body { padding: 24px; text-align: center; }
+
+/* Patient info row */
+.qr-patient-info { margin-bottom: 16px; }
+.qr-patient-avatar {
+    width: 48px; height: 48px;
+    border-radius: 14px;
+    background: var(--bg2);
+    border: 2px solid var(--border);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 800; color: var(--text);
+    margin-bottom: 8px;
+}
+.qr-patient-name {
+    font-size: 15px; font-weight: 700; color: var(--text);
+    letter-spacing: -0.2px;
+}
+.qr-patient-id {
+    font-size: 11px; color: var(--text3); font-family: monospace;
+    margin-top: 2px;
+}
+.qr-patient-meta {
+    display: flex; justify-content: center; gap: 16px;
+    margin-top: 8px; font-size: 11px; color: var(--text3);
+}
+.qr-patient-meta span { display: flex; align-items: center; gap: 4px; }
+
+/* QR Image area */
+.qr-image-wrap {
+    background: #fff;
+    border-radius: 14px;
+    padding: 16px;
+    display: inline-block;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    transition: transform 0.3s ease;
+}
+.qr-card:hover .qr-image-wrap { transform: scale(1.03); }
+.qr-image-wrap img {
+    width: 160px; height: 160px;
+    display: block;
+}
+
+/* Action buttons */
+.qr-actions {
+    display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+}
+.qr-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-size: 11px; font-weight: 600;
+    cursor: pointer; font-family: 'Inter', sans-serif;
+    border: 1px solid var(--border);
+    background: var(--bg2); color: var(--text);
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+.qr-btn:hover {
+    background: var(--text); color: var(--bg); border-color: var(--text);
+    transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+.qr-btn.copy-btn { background: #7c3aed; color: #fff; border-color: #7c3aed; }
+.qr-btn.copy-btn:hover { background: #6d28d9; }
+.qr-btn.copy-btn.copied { background: #16a34a; border-color: #16a34a; }
+.qr-btn.download-btn:hover { background: #2563eb; color: #fff; border-color: #2563eb; }
+.qr-btn.view-btn:hover { background: #d97706; color: #fff; border-color: #d97706; }
+
+/* Toast */
+.qr-toast {
+    position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+    background: #16a34a; color: #fff;
+    padding: 12px 28px; border-radius: 99px;
+    font-weight: 700; font-size: 13px;
+    z-index: 9999; opacity: 0; pointer-events: none;
+    transition: opacity 0.3s ease;
+    box-shadow: 0 8px 24px rgba(22,163,74,0.4);
+}
+.qr-toast.show { opacity: 1; }
+
+/* Reveal animation */
+.qr-card { opacity: 0; transform: translateY(20px); }
+.qr-card.revealed { animation: qrReveal 0.45s cubic-bezier(0.23,1,0.32,1) forwards; }
+@keyframes qrReveal { to { opacity: 1; transform: translateY(0); } }
+
+/* Dark */
+[data-theme="dark"] .qr-card { box-shadow: 0 2px 16px rgba(0,0,0,0.2); }
+[data-theme="dark"] .qr-card:hover { box-shadow: 0 16px 40px rgba(0,0,0,0.5); }
+[data-theme="dark"] .qr-image-wrap { background: #fff; }
+
+@media (max-width: 480px) {
+    .qr-grid { grid-template-columns: 1fr; }
+    .qr-toolbar { flex-direction: column; align-items: flex-start; }
+}
+</style>
+{% endblock %}
+{% block content %}
+<div class="container">
+
+    <div class="qr-toolbar">
+        <h1>▣ Patient QR Codes<span class="qr-count">{{ patients|length }}</span></h1>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline">← Dashboard</a>
+            <button class="btn btn-primary" onclick="copyAllQRCodes()">📋 Copy All Links</button>
+        </div>
+    </div>
+
+    <div class="qr-grid" id="qrGrid">
+        {% for p in patients %}
+        <div class="qr-card" data-name="{{ p.first_name }} {{ p.second_name }}" data-url="{{ BASE_URL }}/patient/qr/{{ p.id }}" style="animation-delay: {{ loop.index0 * 0.04 }}s">
+            <div class="qr-card-accent"></div>
+            <div class="qr-card-body">
+                <!-- Patient Info -->
+                <div class="qr-patient-info">
+                    <div class="qr-patient-avatar">{{ p.first_name[0]|upper }}{{ p.second_name[0]|upper }}</div>
+                    <div class="qr-patient-name">{{ p.first_name }} {{ p.second_name }}</div>
+                    <div class="qr-patient-id">{{ p.national_id }}</div>
+                    <div class="qr-patient-meta">
+                        <span>🩺 {{ p.injury_count }} injuries</span>
+                        <span>🔍 {{ p.scan_count }} scans</span>
+                    </div>
+                </div>
+
+                <!-- QR Code Image -->
+                <div class="qr-image-wrap">
+                    <img src="{{ url_for('patient.patient_qrcode', pid=p.id) }}"
+                         alt="QR for {{ p.first_name }} {{ p.second_name }}"
+                         loading="lazy"
+                         onerror="this.parentElement.innerHTML='<div style=\\'padding:40px;color:#999\\'>QR unavailable</div>'">
+                </div>
+
+                <!-- Actions -->
+                <div class="qr-actions">
+                    <button class="qr-btn copy-btn" onclick="copyQRUrl(this, '{{ BASE_URL }}/patient/qr/{{ p.id }}', '{{ p.first_name }}')">
+                        📋 Copy Link
+                    </button>
+                    <a href="{{ url_for('patient.qr_view', pid=p.id) }}" target="_blank" class="qr-btn view-btn">
+                        🔗 View Page
+                    </a>
+                    <button class="qr-btn download-btn" onclick="downloadQR({{ p.id }}, '{{ p.first_name }}_{{ p.second_name }}')">
+                        💾 Download
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        {% if not patients %}
+        <div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--text3);font-size:14px">
+            No approved patients yet. Register patients first.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Toast -->
+<div class="qr-toast" id="qrToast"></div>
+
+{% endblock %}
+{% block extra_js %}
+<script>
+// ── Card reveal animation ──
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.qr-card').forEach(function(card, i) {
+        setTimeout(function() { card.classList.add('revealed'); }, i * 60);
+    });
+});
+
+// ── Copy single QR URL ──
+function copyQRUrl(btn, url, name) {
+    navigator.clipboard.writeText(url).then(function() {
+        showToast('✅ ' + name + ' QR link copied!');
+        btn.classList.add('copied');
+        btn.textContent = '✅ Copied!';
+        setTimeout(function() {
+            btn.classList.remove('copied');
+            btn.textContent = '📋 Copy Link';
+        }, 2000);
+    }).catch(function() {
+        // Fallback for older browsers
+        var input = document.createElement('textarea');
+        input.value = url;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        document.body.removeChild(input);
+        showToast('✅ Copied (fallback)');
+    });
+}
+
+// ── Copy ALL QR links ──
+function copyAllQRCodes() {
+    var cards = document.querySelectorAll('.qr-card');
+    var links = [];
+    cards.forEach(function(card) {
+        var url = card.dataset.url;
+        var name = card.dataset.name;
+        links.push(name + ': ' + url);
+    });
+    var text = links.join('\\n');
+    navigator.clipboard.writeText(text).then(function() {
+        showToast('✅ All ' + links.length + ' QR links copied!');
+    }).catch(function() {
+        var input = document.createElement('textarea');
+        input.value = text;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        document.body.removeChild(input);
+        showToast('✅ All ' + links.length + ' links copied!');
+    });
+}
+
+// ── Download QR as PNG ──
+function downloadQR(pid, name) {
+    var img = document.querySelector('img[alt*="' + name.split('_')[0] + '"]');
+    // Find the correct image by pid
+    var allImgs = document.querySelectorAll('.qr-image-wrap img');
+    allImgs.forEach(function(im) {
+        if (im.src.indexOf('/patient/api/patient/' + pid + '/qrcode') !== -1) {
+            img = im;
+        }
+    });
+    if (!img || !img.src) return;
+    // Create canvas, draw image, download
+    var canvas = document.createElement('canvas');
+    var ctx = canvas.getContext('2d');
+    var size = 400;
+    canvas.width = size; canvas.height = size;
+    var image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = function() {
+        // White background
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, size, size);
+        // Center QR
+        var padding = 20;
+        ctx.drawImage(image, padding, padding, size - padding*2, size - padding*2);
+        var link = document.createElement('a');
+        link.download = 'QR_' + name.replace(/ /g, '_') + '.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    };
+    image.src = img.src;
+}
+
+// ── Toast ──
+function showToast(msg) {
+    var toast = document.getElementById('qrToast');
+    toast.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(toast._timeout);
+    toast._timeout = setTimeout(function() {
+        toast.classList.remove('show');
+    }, 2500);
+}
+</script>
+{% endblock %}
